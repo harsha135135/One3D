@@ -1,12 +1,21 @@
-# One3D / PrintFlow — Architecture
+# One3D by OneCreations / PrintFlow — Architecture
 
-Status: draft · Last reviewed: 2026-09-28
+Status: draft · Last reviewed: 2026-09-30
 
 ![System architecture](architecture.svg)
 
 ## 1. Purpose and scope
 
-PrintFlow is the order-to-shipment system behind **One3D**, a custom figurine and small-batch 3D printing service. It also runs **PrintBack**, a documented take-back and material-ledger program. **OneCreations** is the public portfolio site, deployed separately.
+PrintFlow is the order-to-shipment system behind **One3D by OneCreations**, the custom-collectible and small-batch 3D printing business of the OneCreations studio. It will also run **PrintBack**, a documented take-back and material-ledger program, once a real collection route exists. **OneCreations** is the parent brand and public portfolio. It is a separate Next.js app in its own repository and deployment.
+
+```
+OneCreations (parent studio, portfolio)      onecreations.in
+└── One3D by OneCreations (business)         make.onecreations.in        customer app
+    ├── PrintFlow (internal software)        ops.make.onecreations.in    operator app
+    └── PrintBack (later)                    collection, credits, "Make from your material"
+```
+
+Business context, budget and unit economics are in [docs/business-plan.md](docs/business-plan.md). Brand, sites and journeys are in [docs/brand-and-websites.md](docs/brand-and-websites.md). PrintBack economics and claims are in [docs/printback.md](docs/printback.md). Delivery sequencing is in [docs/roadmap.md](docs/roadmap.md).
 
 The system is built as a small, well-instrumented manufacturing application with explicit physical safety boundaries. The engineering priorities are:
 
@@ -33,7 +42,7 @@ Adding more cloud services is not a goal. Each service needs a reason to be ther
 | Phase | Scope |
 |---|---|
 | **MVP / first paid orders** | Static OneCreations site. One3D customer and operator web apps. HTTP API Gateway → Lambda modules. Private S3, DynamoDB, Cognito, payment provider, email. SQS + DLQ for async validation. One Step Functions Standard workflow: *asset validation → preparation → operator review*. Quoting, slicing, assignment and bed-clear confirmation are **manual**. One repo, a few deployment units, no microservice fleet. |
-| **First connected printers** | Bridge service on a local mini PC. AWS IoT Core with one X.509 certificate per bridge (mTLS, outbound only). Durable command table plus edge SQLite journal. Short-lived S3 URLs for approved artifacts. Immutable print attempts, reconciliation, metrics and alerts. The Bambu X1C starts with **monitoring and operator-confirmed dispatch** until the firmware integration path is verified. |
+| **First connected printer** | The existing Bambu X1C (no AMS) is the only machine at the start. More compatible machines are added only after the [purchase gate](docs/business-plan.md#printer-purchase-gate). Bridge service on an existing computer or mini PC. AWS IoT Core with one X.509 certificate per bridge (mTLS, outbound only). Durable command table plus edge SQLite journal. Short-lived S3 URLs for approved artifacts. Immutable print attempts, reconciliation, metrics and alerts. The Bambu X1C starts with **monitoring and operator-confirmed dispatch** until the firmware integration path is verified. |
 | **Later** | Containerised mesh/slicing workers: local first, then ECS/Fargate or AWS Batch when demand is measured. EventBridge once several consumers need the same event. Full material inventory, credit ledger, partner receipts and reconciliation. Scheduling optimisation, multiple farms and analytics, but only after there is operational data to justify them. |
 
 Test and production live in separate AWS accounts if manageable. Otherwise they use separate stacks and roles, and development roles cannot read production data.
@@ -44,7 +53,7 @@ Test and production live in separate AWS accounts if manageable. Otherwise they 
 
 | Client | Purpose | Auth |
 |---|---|---|
-| OneCreations site | Public portfolio and editorial stories | None (public) |
+| OneCreations site (parent) | Public portfolio and editorial stories. It links to One3D via `NEXT_PUBLIC_ONE3D_URL`. | None (public) |
 | One3D customer web | Uploads, orders, approvals, payments, credits, provenance | Cognito, or a restricted guest upload session |
 | Operator console | Quotes, plan approval, slicing hand-off, assignment, QC, finishing, material intake | Cognito with MFA and explicit roles. A hidden URL is not access control. |
 
@@ -70,7 +79,7 @@ Test and production live in separate AWS accounts if manageable. Otherwise they 
 |---|---|
 | **Bridge service** (existing mini PC) | Holds the durable SQLite command journal, checks preconditions, records `START_INTENT`, sends machine I/O through adapters, uploads events in order, and reconciles after a restart. Makes outbound connections only. |
 | **Printer adapters** | Each adapter declares what it can do (`monitor`, `upload`, `start`, `pause`, `jobId`). The system never assumes a generic `startPrint()`. |
-| **Printers** | Existing FDM farm (no AMS) and a Bambu X1C (monitoring plus operator-confirmed start at first). |
+| **Printers** | One Bambu X1C (no AMS) at the start, with monitoring plus operator-confirmed start until the LAN / Developer Mode path is verified on its firmware. Further machines are added only when a measured printing bottleneck passes the purchase gate. A few repeatable configurations are preferred over a mix of flagships. |
 | **Printer simulator** | Deterministic failure injection for tests and demos. Its output is always labelled as simulated. |
 | **Local slicing / mesh worker** | Controlled, versioned slicer profiles. Machine instructions are always generated from those profiles. Customer-supplied G-code is never run. |
 | **Operator station** | Bed-clear confirmation, part QC, finishing, final QC. |
@@ -78,9 +87,16 @@ Test and production live in separate AWS accounts if manageable. Otherwise they 
 
 ### 4.4 OneCreations boundary
 
-OneCreations is deployed separately: CloudFront, a public asset bucket and a small content layer. It never queries the One3D production database.
+OneCreations is the parent brand, but technically it is an independent system: a Next.js 16 app (`harsha135135/OneCreations`) on DigitalOcean App Platform (`blr`). Its content is git-as-CMS, stored as typed arrays in `web/lib/*.ts` and edited through a local-only admin console. It never queries One3D's production database or storage, and One3D never depends on it.
 
-Publishing works like this: a selected One3D result becomes a *publication candidate*. After customer consent and editorial approval, sanitised derivative images and story text are copied into the OneCreations public bucket or CMS.
+Publishing is one-way:
+
+```
+One3D order completed → PublicationPermission recorded → editorial selection
+→ sanitised derivative photos + story → OneCreations content entry (commit) → deploy
+```
+
+OneCreations links back to One3D (header, home section, "Create yours" on printed pieces) through a single `NEXT_PUBLIC_ONE3D_URL` setting.
 
 - **Shared between the two sites:** UI primitives, schemas, build tooling and approved derivative assets.
 - **Never shared:** customer photos, raw models, addresses, credits, payment records, authentication and IAM/deploy permissions.
@@ -102,7 +118,13 @@ One status field with 20+ stages would mix several independent lifecycles, so th
 | Finishing task | Assembly, sanding, painting, packing |
 | Shipment | Fulfilment and tracking |
 | Material batch | Physical input/output inventory |
+| Quote version | Immutable priced offer. Accepting it freezes price, scope and delivery commitment. |
+| Approval | Customer or operator sign-off on a specific design revision or quote version |
+| Material lot | A spool or batch of filament, or recovered material, with supplier, polymer, colour and rate-card cost |
+| Material movement | Consumption, transfer, split/merge or scrap of a lot, in integer grams |
 | Credit entry | Immutable financial or loyalty movement with a reason |
+| Credit reservation | Hold of credits against an order until the payment outcome is known |
+| Publication permission | Customer consent to publish, kept separate from manufacturing and AI-processing consent |
 
 > Example: an order with 8 parts might need 3 build plates, one of which fails once. That is **1 order, 3 jobs and 4 attempts**. Metrics and costs always state which of these they count.
 
@@ -114,7 +136,8 @@ Order:      DRAFT → DESIGN_IN_PROGRESS → AWAITING_APPROVAL → APPROVED → 
 Payment:    PENDING → PARTIALLY_PAID → PAID → REFUND_PENDING → REFUNDED
 Design:     WORKING → REVIEW_REQUIRED → APPROVED → SUPERSEDED
 Attempt:    PLANNED → RESERVED → READY → START_INTENT → RUNNING → PRINT_COMPLETED → QC_PASSED
-            (+ FAILED_CONFIRMED, CANCELLED_BEFORE_START, RECONCILIATION_REQUIRED)
+            (+ FAILED_CONFIRMED, CANCELLED_BEFORE_START, RECONCILIATION_REQUIRED, QC_REJECTED)
+Credit:     ISSUED · AVAILABLE · RESERVED · REDEEMED · RELEASED · REINSTATED · REVERSED · EXPIRED
 Printer connectivity: ONLINE / STALE / OFFLINE
 Printer physical:     IDLE / RUNNING / PAUSED / ERROR / UNKNOWN
 ```
@@ -124,6 +147,7 @@ Rules:
 - A customer revision creates a **new** design revision. It never overwrites geometry that an active print is using.
 - A reprint creates a **new** attempt with a reason and a cost attribution. The failed attempt's material and time stay on record.
 - Parts are inspected before assembly, and there is a final QC after finishing so that painting and assembly defects are caught.
+- A credit redemption is allowed only up to `min(balance, published cap, contribution before credits − contribution floor)`. A flat percentage cap can exceed the entire margin of a custom order (see [docs/printback.md §3](docs/printback.md#3-a-percentage-cap-does-not-protect-margin)).
 
 ## 6. Physical dispatch protocol
 
@@ -192,6 +216,16 @@ The command carries: `commandId`, `attemptId`, `printerId`, assignment `generati
 - GSIs are for listing candidates only. The authoritative record is re-checked inside a conditional transaction before assignment.
 - There is no global `PK=QUEUED` partition, and no scan on every dashboard refresh. A ten-printer farm does not need sharding yet.
 - Money is stored as integer paise, credits as integer credit units and mass as integer grams. Every record keeps its rate-card version.
+- **Material rate card.** Filament cost is stored per lot as paise per kg, with a versioned rate card. Attempt cost is computed from the grams consumed (including failed attempts) × the lot's rate. The first rate-card version is Numakers pricing (2026-09):
+
+  | Filament | Paise/kg |
+  |---|---|
+  | PLA+ | 65,000 |
+  | PLA Matte | 70,000 |
+  | Specials | 90,000–100,000 |
+  | PETG | 65,000 |
+
+  PETG lots and scrap are never merged with PLA or PET.
 
 ### 8.2 Transactions
 
@@ -290,7 +324,7 @@ The process is chosen per product and recorded in the manufacturing plan:
 
 | Product | Starting route | Main constraint |
 |---|---|---|
-| Stylised bust, chibi, larger simple collectible | Existing FDM farm, single material, controlled finishing | Sanding/painting time |
+| Stylised bust, chibi, larger simple collectible | X1C FDM, single material (no AMS), controlled finishing | Sanding/painting time |
 | Small realistic face, jewellery, hair, delicate accessories | Outsourced resin sample compared against FDM | Detail, support damage, breakage |
 | Large premium figurine | FDM body/base plus separate detail parts if justified | Assembly, fit, consistency |
 | Repeat creator collectible | Approved master with a repeatable bill of materials and finishing recipe | Per-unit painting labour |
@@ -354,10 +388,10 @@ $$
 
 Every figure states its denominator. Estimated virgin displacement is $D = \sum_p R_p \times s_p$, using a documented substitution factor $s_p$. If there is no defensible substitute, $s_p$ is zero or "unknown". Displaced polymer mass is not avoided CO₂.
 
-### 13.4 PrintBack vs RePrint
+### 13.4 PrintBack and "Make from your material"
 
 - **PrintBack:** a pooled stream with documented custody. Credits are based only on verified acceptance.
-- **RePrint:** a paid feasibility assessment followed by a segregated batch. It promises batch identity only when the process can actually preserve it, and discloses minimum input, losses, virgin additions, colour variation and the fallback if it fails.
+- **Make from your material** (previously planned as the separate "RePrint" brand, now postponed): a premium service inside PrintBack. It is a paid feasibility assessment followed by a segregated batch. It promises batch identity only when the process can actually preserve it, and discloses minimum input, losses, virgin additions, colour variation and the fallback if it fails.
 
 ### 13.5 Claims and regulatory constraints the software must respect
 
@@ -411,17 +445,27 @@ Storage and egress dominate, not orchestration. A 100 KB camera snapshot every m
 
 ## 17. Repository layout
 
+Two independently deployable repositories:
+
 ```
-apps/        onecreations/  one3d/
-packages/    domain/  contracts/  ui/
-services/    api/  workers/  notifications/
-edge/        bridge/  adapters/  simulator/
-infra/       sam/
-tests/       integration/  failure/  fixtures/
-docs/        decisions/  runbooks/  measurements/
+harsha135135/OneCreations    parent portfolio site (Next.js, DigitalOcean) and approved public content
+harsha135135/One3D           customer app, operator app and PrintFlow (this repo)
 ```
 
-Directories are for organising code. A directory is not automatically its own deployable service.
+Planned One3D layout (today the repo holds only these docs):
+
+```
+apps/        customer/  operator/
+packages/    domain/  contracts/  ui/
+services/    api/  workers/  notifications/
+edge/        bridge/  adapters/bambu/  simulator/
+infra/       sam/
+tests/       integration/  failure/  fixtures/
+docs/        architecture/  decisions/  runbooks/  measurements/
+labs/        certification/
+```
+
+Directories are for organising code. A directory is not automatically its own deployable service. Design tokens and basic UI primitives may be shared with OneCreations. Storage, identity, customer assets, financial records and deploy permissions are never shared.
 
 ## 18. Acceptance demo
 
@@ -441,3 +485,6 @@ Directories are for organising code. A directory is not automatically its own de
 - Resin and solvent disposal route (from the SDS and a local authority), plus SPCB/PCC consents before any processing equipment.
 - Contracts with the recycling partner: registration, stream specifications, and ownership of environmental attributes.
 - Payment provider webhook signing and replay semantics.
+- Trademark and domain clearance for "One3D" (IP India search). Otherwise launch as "OneCreations — Custom Manufacturing".
+- Whether One3D registers for GST, which affects whether input credit applies to filament. Also a CA classification of goods, design services, printing services and waste-for-credit.
+- DPDP Rules phase-in dates, and a retention schedule for source photos, models and invoices.

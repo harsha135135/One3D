@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1170" viewBox="0 0 1440 1170" font-family="Helvetica, Arial, sans-serif">
-<title>One3D / PrintFlow system architecture</title>
+<title>One3D by OneCreations / PrintFlow system architecture</title>
 <style>
 .title{font:700 22px -apple-system,Segoe UI,Helvetica,Arial,sans-serif;fill:#1d2330}
 .sub{font:400 13px -apple-system,Segoe UI,Helvetica,Arial,sans-serif;fill:#555}
@@ -22,7 +22,7 @@
 <marker id="as" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3b4150"/></marker>
 </defs>
 <rect width="1440" height="1170" fill="#ffffff"/>
-<text x="40" y="38" class="title">One3D / PrintFlow — System Architecture</text>
+<text x="40" y="38" class="title">One3D by OneCreations · PrintFlow — System Architecture</text>
 <text x="40" y="60" class="sub">MVP → first connected printers · durable command ownership, recoverable edge execution, honest material records</text>
 <rect x="40" y="76" width="1040" height="118" rx="12" fill="#F3F6FB" stroke="#5B6F99" stroke-width="1.5"/>
 <text x="54" y="98" class="zone" fill="#5B6F99">CLIENTS</text>
@@ -115,18 +115,18 @@
 <text x="892" y="722" class="l">alarms: stale bridge,</text>
 <text x="892" y="737" class="l">outbox age, DLQ depth</text>
 <rect x="56" y="480" width="228" height="262" rx="10" fill="#F7F0FB" stroke="#8A5AA8" stroke-width="1.5" stroke-dasharray="6 4"/>
-<text x="90" y="500" class="zone" fill="#8A5AA8">ONECREATIONS (ISOLATED)</text>
+<text x="90" y="500" class="zone" fill="#8A5AA8">ONECREATIONS (PARENT)</text>
 <rect x="70" y="515" width="200" height="64" rx="8" class="box"/>
-<text x="82" y="537" class="t">CloudFront + static site</text>
-<text x="82" y="555" class="l">separate deploy</text>
+<text x="82" y="537" class="t">Next.js · DO App Platform</text>
+<text x="82" y="555" class="l">separate repo + deploy</text>
 <rect x="70" y="596" width="200" height="82" rx="8" class="box"/>
-<text x="82" y="618" class="t">Public asset bucket / CMS</text>
-<text x="82" y="636" class="l">sanitized derivatives only</text>
-<text x="82" y="651" class="l">never reads One3D DB</text>
+<text x="82" y="618" class="t">git-as-CMS content</text>
+<text x="82" y="636" class="l">sanitised assets only</text>
+<text x="82" y="651" class="l">never reads One3D data</text>
 <rect x="40" y="800" width="1360" height="290" rx="12" fill="#EEF7F0" stroke="#3C8A55" stroke-width="1.5"/>
 <text x="520" y="822" class="zone" fill="#3C8A55">PRINT FARM (EDGE) — OUTBOUND CONNECTIONS ONLY · LOCAL FIRMWARE OWNS MACHINE SAFETY</text>
 <rect x="70" y="840" width="400" height="170" rx="8" class="crit"/>
-<text x="82" y="862" class="t">Bridge service (mini PC)</text>
+<text x="82" y="862" class="t">Bridge service (local PC)</text>
 <text x="82" y="880" class="l">SQLite command journal (durable)</text>
 <text x="82" y="895" class="l">preconditions: idle · bed clear · material/profile</text>
 <text x="82" y="910" class="l">  · assignment generation still current</text>
@@ -141,9 +141,10 @@
 <text x="542" y="910" class="l">no generic startPrint() assumed</text>
 <rect x="850" y="840" width="260" height="100" rx="8" class="box"/>
 <text x="862" y="862" class="t">Printers</text>
-<text x="862" y="880" class="l">Bambu X1C: monitor +</text>
+<text x="862" y="880" class="l">Bambu X1C (no AMS): monitor +</text>
 <text x="862" y="895" class="l">  operator-confirmed start</text>
-<text x="862" y="910" class="l">existing FDM farm (no AMS)</text>
+<text x="862" y="910" class="l">more machines only after</text>
+<text x="862" y="925" class="l">  measured purchase gate</text>
 <rect x="530" y="972" width="260" height="86" rx="8" class="box"/>
 <text x="542" y="994" class="t">Printer simulator</text>
 <text x="542" y="1012" class="l">failure injection for tests/demos</text>
@@ -165,7 +166,7 @@
 <text x="548" y="236" class="al" text-anchor="start">HTTPS + JWT</text>
 <path d="M 710 174 V 248" class="a" marker-end="url(#ae)"/>
 <path d="M 76 174 V 513" class="a" marker-end="url(#ae)"/>
-<text x="84" y="262" class="al" text-anchor="start">static</text>
+<text x="84" y="262" class="al" text-anchor="start">HTTPS</text>
 <path d="M 380 174 V 204 H 295 V 463 H 650 V 478" class="ad" marker-end="url(#ae)"/>
 <text x="452" y="458" class="al" text-anchor="start">direct presigned upload → quarantine</text>
 <path d="M 1120 145 H 1088 V 204 H 755 V 290 H 742" class="a" marker-end="url(#ae)"/>
