@@ -2,6 +2,8 @@
 
 Status: draft · Last reviewed: 2026-09-30
 
+Scope alignment updated: 2026-10-07. The [V1 scope](v1-scope.md) governs the current portfolio application. Brand direction applies to V1, but the expanded commercial sitemap and journeys below are V2+ context. They do not require a full storefront, real fulfilment or a recycling program before V1 acceptance.
+
 ## 1. Brand architecture
 
 ```
@@ -38,12 +40,12 @@ Adding "by OneCreations" does not by itself resolve a trademark conflict.
 | Host | Purpose |
 |---|---|
 | `onecreations.in` | OneCreations portfolio. This is the existing Next.js 16 app on DigitalOcean App Platform. |
-| `make.onecreations.in` | One3D customer application |
-| `ops.make.onecreations.in` | Restricted operator application |
+| `one3d.store` | Intended One3D customer application and labelled V1 demonstration |
+| `one3d.store/ops` | Operator screens in the same One3D application, protected by backend authorization |
 
-This keeps two distinct websites without making an unverified domain purchase a prerequisite. A subdomain does not mean sharing a frontend, deployment, authentication or database. Google states that it has no ranking preference between subdomains and subdirectories.
+OneCreations remains a separate website, repository and deployment. One3D has one responsive frontend for customer and operator routes, backed by the same Spring application. An `/ops` path does not grant permission; every protected API checks role and ownership. These addresses are intended destinations, not a claim of an existing deployment.
 
-If the commercial site later moves to its own domain (for example `one3d.in`, if available and cleared), use redirects, consistent canonical URLs and updated links. Don't publish the same story in full on both sites.
+Use consistent canonical URLs and links when One3D is published. Don't publish the same story in full on both sites.
 
 ## 3. How the two sites relate
 
@@ -54,7 +56,7 @@ OneCreations links to One3D. It never reads One3D's data.
   - the home page has a One3D section;
   - printed pieces have a "Create yours with One3D" link;
   - the footer carries the endorsement.
-- **Where the link points:** all of these links come from one setting, `NEXT_PUBLIC_ONE3D_URL`. Until `make.onecreations.in` exists, they fall back to an early-access email.
+- **Where the link points:** all of these links come from one setting, `NEXT_PUBLIC_ONE3D_URL`. Set it to `https://one3d.store` when the site is available; until then, use the existing early-access email fallback.
 - **Sharing message:** "Nothing sold, everything shared" stops working once the parent visibly owns a business, so it is replaced with:
 
 > We share how we make things. One3D helps you make yours.
@@ -103,6 +105,18 @@ It would also add a **Journal** (workshop notes, experiments, failed experiments
 
 ## 5. One3D sitemap
 
+### V1: the bounded portfolio application
+
+- One product page and catalog-order action.
+- Signed-in custom STL request, revision, manual quote and approval screens.
+- Sandbox checkout and the customer's own order timeline.
+- `/ops`: review/quote queue, release/assignment, attempts, simulator reconciliation, clearance, QC and manual handoff.
+- Sign-in, useful error/empty/loading states and clear notices identifying demo data, test payments and simulated printing.
+
+There is no requirement to build the expanded navigation below. Keep the V1 interface small and refer to [the scope](v1-scope.md) for exact limits.
+
+### V2+: candidate commercial sitemap
+
 Use descriptive navigation instead of CREATE / PRINT / PRODUCE, which first-time visitors won't understand: **Custom figurines · Print your model · Batch orders · How it works**. Add **Recycle & rewards** only when PrintBack really operates.
 
 ```
@@ -131,19 +145,73 @@ The first home page, in order:
 
 ## 6. Visual direction
 
+### Chosen references — 2026-09-30
+
+Use **Omarchy Matte Black for OneCreations** and **Omarchy Vantablack for One3D**. These names refer to the two themes shown in the supplied screenshots and checked on [Omarchy](https://omarchy.org/). This supersedes the earlier violet-accent direction.
+
+This section records the direction for a future One3D implementation. The current change is documentation only; building the One3D application remains a separate task.
+
 | Element | OneCreations | One3D |
 |---|---|---|
-| Feeling | Creative workshop | Clear, capable manufacturing service |
-| Layout | Large imagery, varied compositions | Consistent forms, cards and timelines |
-| Typography | Expressive display type (Instrument Serif, Object Sans) with readable body text | Readable type with strong hierarchy |
-| Motion | Selective (GSAP, R3F), optional | Functional feedback and progress |
+| Reference | Omarchy Matte Black | Omarchy Vantablack |
+| Feeling | Warm, tactile creative workshop | Precise, calm manufacturing service |
+| Layout | Generous space, strong imagery, fine dividers | Consistent forms, cards, summaries and timelines |
+| Typography | Readable sans body; restrained monospace labels and metadata; own wordmark | Readable sans for instructions and forms; monospace for dimensions, prices and order identifiers |
+| Motion | One optional pixel-field effect in the home hero | Functional feedback and progress; any decorative effect confined to a future marketing hero |
 | Photography | Process, atmosphere, experiments | Product detail, scale, finish, packaging |
-| Colour | Flexible project accents on the dark base | Restrained brand accent plus semantic status colours |
+| Colour | Charcoal surfaces, warm white text, restrained amber accent | Black and graphite surfaces, white text, silver accents; semantic status colours when needed |
+| Controls | Mostly square geometry, visible borders, quiet hover changes | Clear boundaries and labels, strong focus states, comfortable touch targets |
 | Main action | Explore the work | Configure, approve, pay, track |
 
-The sites connect through related wordmarks, a shared typographic foundation, a small common palette, the same photography standards, and consistent material and process terms. They should not look like the same dashboard.
+The sites connect through related wordmarks, a shared typographic foundation, the same photography standards, and consistent material and process terms. Keep the original colours of product photographs, finishes and materials. The monochrome One3D interface must not desaturate the products it sells.
 
-## 7. Customer journeys
+### Reference colours and future tokens
+
+These values were observed in the [official Omarchy theme stylesheet](https://github.com/omacom/omarchy-site/blob/master/src/styles.css) on 2026-09-30. They are reference values, not a claim that every possible foreground/background pairing is accessible.
+
+| Role | Matte Black reference | Vantablack reference |
+|---|---|---|
+| Page | `#121212` | `#000000` |
+| Deeper region | `#0d0d0d` | `#000000` |
+| Surfaces | `#181818`, `#1e1e1e` | `#0d0d0d`, `#1a1a1a` |
+| Main text | `#eaeaea` | `#ffffff` |
+| Secondary text | `#bebebe` | `#ffffff` |
+| Muted text | `#8a8a8a` | `#a8a8a8` |
+| Accent | `#e68e0d` | `#8d8d8d` |
+
+For future implementation, define semantic tokens for page, surface, elevated surface, text, muted text, decorative border, control boundary, accent, text on accent, focus, success, warning and error. Preserve distinct surface levels instead of replacing all dark shades with one colour.
+
+For One3D primary actions, start with a light neutral fill and dark text. Test silver buttons and all hover, disabled, error and focus states as complete pairs. Decorative separators can be subtle; boundaries needed to identify an input or control must remain clear. Use a label and icon alongside status colour, such as “Needs approval” or “Payment failed”.
+
+Keep the matte treatment: flat surfaces, restrained shadows, fine dividers and limited corner rounding. Avoid glass panels, large glows, competing gradients and a full-page terminal aesthetic. Omarchy's pixel wordmark, desktop previews and icons remain its identity; create original OneCreations and One3D assets. Review the applicable licence before reusing any source, font or asset.
+
+### Pixel animation
+
+The current Omarchy background resembles cellular automata, but its [official implementation](https://github.com/omacom/omarchy-site/blob/master/src/components/HeroPixelField.tsx) uses animated noise, ordered dithering and pointer effects. It is not a Conway's Game of Life simulation.
+
+For OneCreations, a genuine **Conway B3/S23** simulation is the recommended original interpretation: cells are born with three neighbours and survive with two or three. Keep the field sparse around the hero edges and leave the heading, actions and featured work visually quiet. Keep the readable brand name present throughout. Use a single decorative effect; avoid stacking the simulation with a shader, ambient video, animated grain and a moving divider.
+
+Future implementation requirements:
+
+- Use a small Canvas 2D grid with bounded resolution and a capped device-pixel ratio. A fixed simulation step around 8–12 updates per second is a starting point to profile, not an accessibility guarantee.
+- Keep simulation buffers outside React rendering. Clean up animation loops, observers and listeners on unmount.
+- Pause when offscreen or when the tab is hidden. Provide a visible pause/resume control and a static fallback when JavaScript is unavailable.
+- Respect `prefers-reduced-motion` from first render and when it changes: show a static composition and stop simulation, video autoplay, parallax and decorative transitions. Do not merely hide a canvas while its loop continues running.
+- Keep decorative canvas content out of the accessibility tree and away from pointer/keyboard interaction. Pointer effects must never obstruct links or require dragging on touch screens.
+- Avoid large, bright, synchronised flashes. Keep essential content outside the effect and usable independently of it.
+- Do not put continuous decorative animation behind One3D configuration, upload, checkout, approval or operator screens. A future marketing hero may use a quieter monochrome interpretation after performance and accessibility checks.
+
+### Accessibility and performance acceptance
+
+Target [WCAG 2.2 AA](https://www.w3.org/WAI/WCAG22/quickref/): normal text contrast of at least 4.5:1, large text at least 3:1, and the applicable 3:1 non-text contrast requirements for controls and states. Test keyboard access, visible focus, focus obscured by sticky headers, labelled form errors, screen-reader announcements, reflow at 320 CSS pixels, and text zoom. Aim for 44×44 CSS pixel interactive targets; the AA minimum target criterion is 24×24 with defined exceptions.
+
+For nonessential animation that starts automatically and continues alongside content for more than five seconds, provide pause, stop or hide controls. Reduced-motion support complements this requirement; it does not replace the control. See [W3C Pause, Stop, Hide](https://www.w3.org/WAI/WCAG22/Understanding/pause-stop-hide.html).
+
+Future media should use reserved dimensions, responsive images, lightweight posters, and user-triggered loading for heavy 3D viewers. Avoid autoplaying every work card. Target field Core Web Vitals of LCP ≤2.5 s, INP ≤200 ms and CLS ≤0.1 at the 75th percentile, measured separately for mobile and desktop. Lab checks guide development; they do not establish field results. See [Web Vitals](https://web.dev/articles/vitals).
+
+## 7. Future commercial customer journeys (V2+)
+
+These journeys describe the later business. V1 uses the narrower catalog/custom quote demonstration above; design fees, deposits, reference photos, batch orders, rewards and real shipment are not V1 requirements.
 
 ### A. Custom figurine
 
@@ -209,11 +277,14 @@ Make these actions obvious:
 ### Authentication
 
 - OneCreations stays public with no login.
-- One3D allows guest browsing and a restricted guest request. Email must be verified before sensitive uploads or approvals.
+- V1 permits public product browsing, but requires an authenticated customer for requests, uploads, approvals and private records. The backend enforces customer/operator roles and record ownership.
+- A restricted guest request flow is a later option, with identity verification before sensitive uploads or approvals.
 - Cognito handles identity, with email and possibly Google sign-in. Phone OTP adds cost and abuse controls that aren't justified yet.
-- A mobile-friendly website is enough for the MVP. A PWA can come later for operator scanning. A native app is not a priority.
+- A mobile-friendly website is enough for V1. A PWA can come later for operator scanning. A native app is not a priority.
 
-## 8. Operator journeys and QR codes
+## 8. Future operator journeys and QR codes (V2+)
+
+V1 includes only the operator actions listed in section 5 and the scope document. QR scanning, material inventory, finishing/assembly workflows, recycling and credit adjustments below are deferred.
 
 | Situation | Workflow |
 |---|---|

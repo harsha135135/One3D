@@ -1,171 +1,193 @@
-# Roadmap, experiments and evidence
+# Roadmap: finish V1, present the evidence, then expand
 
-Status: draft · Last reviewed: 2026-09-30
+Status: planned; no checkpoint has passed · Last reviewed: 2026-10-07
 
-## 1. MVP boundary
+## 1. How to use this roadmap
 
-### OneCreations (existing site, repositioned as the parent)
+The immediate objective is a fresher backend portfolio project that Harsha understands and can demonstrate. Business automation comes later.
 
-- Real project photography across the existing pillars.
-- Home, pillar indexes, detail pages, tutorials, CSE projects, contact form.
-- One3D endorsement: header link, home section, footer, and "Create yours" links on printed pieces.
-- A small journal can come later. See [brand and websites §4](brand-and-websites.md#4-onecreations-sitemap).
+[V1 scope](v1-scope.md) is the scope authority. [ARCHITECTURE.md](../ARCHITECTURE.md) defines the technical structure. Record actual progress in [IMPLEMENTED.md](../IMPLEMENTED.md) and claims in [resume-evidence.md](resume-evidence.md).
 
-### One3D MVP
+The earlier calendar-driven business roadmap is preserved in [history](history/roadmap-2026-09-30.md). Its printer integration, sustainability, certification and business experiments are not V1 requirements.
 
-- **Products and orders:**
-  - one custom-product offer;
-  - reviewed model upload;
-  - a simple business inquiry;
-  - manual quote creation;
-  - versioned approval.
-- **Customer side:**
-  - private assets;
-  - payment integration;
-  - a customer order timeline.
-- **Operations:**
-  - an operator work queue;
-  - parts, jobs and attempt records;
-  - manual slicing and dispatch;
-  - QC and shipping records.
-- **Measurement:**
-  - labour and cost capture, with filament costed from the Numakers rate card;
-  - internal scrap tracking by filament type.
+Advance through working checkpoints rather than a fixed twelve-week promise. A checkpoint passes after its behavior is demonstrated and Harsha completes its ownership exercise. Time spent understanding a critical concept is preferable to checking off unexplained code.
 
-### Technical proof inside the MVP
+Each checkpoint leaves a runnable application, focused changes, relevant tests and an evidence entry. Nothing below is completed merely because it appears in the plan.
 
-- A duplicate payment callback is harmless.
-- An approved model cannot silently change.
-- Two operators cannot reserve the same printer.
-- A failed attempt keeps its resource cost.
-- Customer files are private.
-- Backups can be restored.
-- A bridge simulator demonstrates uncertain-start reconciliation.
+## 2. First runnable milestone: one order through one simulator
 
-### Postponed
+This milestone is smaller than full V1. Run locally with seeded demo identities and clearly simulated payment. Do not expose an unauthenticated prototype publicly.
 
-- **Automation:** instant quoting for arbitrary geometry, fully automatic likeness approval, autonomous physical retries, automatic bed ejection.
-- **Customer features:** live customer video, a native mobile app, public credits before the ledger and economics work.
-- **Recycling and claims:** household-waste filament, EPR certificate trading, carbon-offset claims.
-- **Business models:** marketplace, franchising, general-purpose farm SaaS.
-- **Infrastructure:** Kubernetes or a microservice fleet, and printers bought mainly for flagship status.
+### Checkpoint 1 — API, database and catalog order
 
-## 2. Twelve-week roadmap
+**Build:** Spring application, PostgreSQL/Flyway, one seeded product/configuration and recipe, REST creation/retrieval of a one-line order, validation, consistent errors and an API reference/test collection.
 
-This assumes 25–30 focused hours a week. Production and customer work count toward those hours.
+**Demonstrate:**
 
-| Week | Business / manufacturing | Software | Evidence |
-|---|---|---|---|
-| 1 | Audit the X1C, costs, space and skills. Define one product. Record the Numakers rate card. | Domain model and measurement definitions | Baseline assumptions |
-| 2 | Produce representative samples and compare finishing methods | OneCreations umbrella repositioning (One3D link, section, copy) | Photographed physical samples |
-| 3 | Interview prospects and seek paid commitments | One3D intake and private uploads | Qualified interest and objections |
-| 4 | Fulfil the first narrowly scoped orders manually | Quotes, orders, operator queue | Timed labour and cost records |
-| 5 | Refine the spec and revision policy | Payment callbacks, approval versions | Duplicate-payment test |
-| 6 | Establish part QC and final QC | Parts, jobs, attempts, inspections | A traceable completed order |
-| 7 | Document the X1C integration capability (LAN / Developer Mode) | Bridge simulator, journal, IoT connection | Duplicate-command test |
-| 8 | Test real monitoring and supervised dispatch | X1C adapter and reconciliation | Firmware/capability evidence |
-| 9 | Identify the actual bottleneck | Queue policy, alerts, cost dashboard | Before/after workflow measurement |
-| 10 | Repeat a small batch | Failure tests, permissions, restore drill | Reproducible recovery evidence |
-| 11 | Get recycler specs and quotes | Internal scrap ledger, synthetic credit tests | Material route and budget model |
-| 12 | Review paid outcomes and the next investment | Deploy, document, record the demo | Go/stop decision per product |
+- Create a fresh database from migrations.
+- Reject invalid input with a useful response.
+- Change catalog data without rewriting an existing order snapshot.
+- Retrieve the order after restarting the application.
 
-Public PrintBack doesn't need to launch in these twelve weeks.
+**Ownership exercise:** trace HTTP → controller → service → SQL; add a validation rule and test; explain the schema and snapshot.
 
-### Over the year
+### Checkpoint 2 — Job, attempt, bed and QC
 
-| Stage | Expansion condition | What to add |
-|---|---|---|
-| First paying customers | Product accepted at a viable price | Better intake, approvals, QC |
-| Small farm | Printing is a measured bottleneck ([purchase gate](business-plan.md#printer-purchase-gate)) | Additional compatible machines, scheduling |
-| Recycling pilot | Buyer, storage, receipts and funded rewards exist | One collection site, audited ledger |
-| B2B production | Approved sample and viable batch economics | Saved profiles, repeat orders, invoices/POs |
-| Larger operation | Repeat demand, enough people and cash | More capacity, tooling comparisons, suppliers |
-| External software | Other farms commit to paying | Multi-tenant controls, support, installers |
+**Build:** an explicit local demo-only eligibility action, operator release, one job, one simulated printer, saved attempts, manual assignment, failure/completion, clearance and whole-part QC. A simple API-driven operator demo is sufficient here.
 
-Expansion is conditional, not scheduled by the calendar.
+**Demonstrate:**
 
-## 3. Experiments and stop/go rules
+- An order passes release → print → QC → ready for handoff.
+- Failure preserves attempt 1; retry creates attempt 2.
+- Completion or failure does not automatically clear the bed.
+- A QC failure prevents readiness for handoff.
 
-These are proposed decision rules, not industry benchmarks.
+**Ownership exercise:** explain why order, job and attempt have different states; change a transition rule and test an invalid transition.
 
-| Question | Experiment | Decision |
-|---|---|---|
-| Will people buy? | Real samples at real prices, request deposits | Count paid commitments, not compliments |
-| Is the likeness acceptable? | Compare references, model and finished piece with customers | Drop styles with persistent dissatisfaction |
-| Can the ₹2k and ₹5k tiers work? | Time 10 paid orders, including messages and rework | Reprice or reduce scope if labour destroys the margin |
-| Does resin help? | Same design and finish via FDM and an outsourced resin supplier | Compare accepted quality and total cost |
-| Does filament choice matter? | Same design in Numakers PLA+, Matte and a special | Keep the cheapest one that passes finish QC. The difference is about ₹100 per order at most. |
-| Can production repeat? | Small batch from an approved master | Check variation, finishing time, breakage |
-| Do credits cause purchases? | Eligible cohorts or staggered offers | Measure incremental contribution |
-| Will people return material? | One site, a few scheduled collections | Accepted kg, participation, cost/kg |
-| Does the material have value? | Real buyer quotes and pickup receipts | No positive default reward without a route |
-| Is reprocessed material usable? | Several batches, virgin control, declared blends | Qualify a specific product, not "recycled plastic" |
-| Does scheduling help? | Heuristic vs manual baseline on the same workload | Keep it only if lead time or effort improves |
-| Buy another printer? | Identify lost profitable demand due to machine capacity | Buy only when downstream capacity exists |
+**First milestone exit:** Harsha can show an end-to-end backend. This is progress, not “V1 complete.”
 
-If custom-figurine economics fail, shift to repeated collectibles, simpler personalisation, useful parts or B2B manufacturing. If consumer rewards fail, PrintBack can become an organisation-funded collection and education program.
+## 3. Complete the bounded application
 
-## 4. AWS certification mapping
+### Checkpoint 3 — Concurrency and durable simulator
 
-AWS says DVA-C03 registration opens 27 October 2026, and the certification page lists **1 December 2026 as the last day for DVA-C02**. Confirm the booking and study against the guide for the exam actually taken.
+**Build:** atomic reservations, protection against competing active ownership, stable command IDs, durable journal, independent simulator restart, failure injection and uncertain-start reconciliation.
 
-| DVA-C02 task | One3D application |
+**Demonstrate:**
+
+- Two concurrent assignments cannot both reserve the printer.
+- Repeating the same command produces one execution.
+- A lost start acknowledgement creates an uncertain state and blocks reassignment.
+- Backend/simulator restarts retain enough evidence to reconcile.
+- Document what resolves uncertainty and what still requires operator action.
+
+**Ownership exercise:** reproduce a race or duplicate; locate its protecting transaction/constraint; explain why timeout is not proof of failure.
+
+### Checkpoint 4 — Identity and bounded frontend
+
+**Build:** the chosen authentication integration, backend-enforced customer/operator roles, customer order views and an operator queue. Include responsive forms and loading/empty/error states.
+
+**Demonstrate:**
+
+- Customer A cannot read Customer B's records even with their IDs.
+- Customers cannot directly call operator-only endpoints.
+- Invalid/expired authentication does not expose protected data.
+- The operator UI relies on permissions, not a secret URL.
+- Forms are usable with a keyboard and on a phone-sized viewport.
+
+**Ownership exercise:** explain authentication versus authorization; locate role and record-ownership checks; diagnose a rejected request.
+
+### Checkpoint 5 — Private STL request and manual quote
+
+**Build:** one STL/revision with the 20 MB limit, authorized direct storage transfer, exact artifact reference/checksum, requirements form, review, quote/expiry, acceptance and frozen order scope. Preparation remains manual outside the application.
+
+**Demonstrate:**
+
+- Unauthorized downloads and oversized uploads are rejected.
+- Replacing the model creates a new submission without inherited approval.
+- Accepted scope identifies exact requirements, artifact and recipe revision.
+- Expired quotes cannot be newly accepted.
+- Repeated acceptance does not create another order.
+
+**Ownership exercise:** trace browser → storage → metadata; distinguish key/version/checksum/signed access; change a quote rule and test it.
+
+### Checkpoint 6 — Payment sandbox and full journey
+
+**Build:** one test-mode provider, signature verification, amount/currency/order checks, durable event/payment identities, manual production release and handoff, and customer progress.
+
+Remove or strictly confine the earlier demo-only paid action so it cannot bypass the hosted payment workflow.
+
+**Demonstrate:**
+
+- Catalog and custom-quote paths reach the same production workflow.
+- A forged callback or wrong amount cannot mark an order paid.
+- Duplicate/reordered delivery cannot regress state or release extra production.
+- A second distinct payment or ambiguous result is flagged for investigation.
+- Payment alone cannot dispatch the printer.
+- QC/handoff produce the corresponding customer timeline facts.
+
+**Ownership exercise:** explain signatures, event deduplication versus payment deduplication and the transaction boundary; replay a sanitized test event.
+
+## 4. Prove deployment and operations at a simple level
+
+### Checkpoint 7 — Docker, AWS, Nginx and one CI pipeline
+
+**Build:** documented Compose setup and persistent volumes; one small EC2 demo with private S3/access controls; Nginx HTTPS/routing; one GitHub Actions check/build/controlled-deploy pipeline; safe demo data and private internal ports.
+
+**Demonstrate:**
+
+- Start from a clean checkout using documented steps.
+- Replace containers without losing expected persisted records.
+- Block promotion when a required test fails.
+- Deploy a known image revision and document how to revert it.
+- Verify HTTPS routing and that database, backend and operational ports are not publicly exposed.
+
+**Ownership exercise:** explain images/containers/volumes, trace proxy routing, diagnose a CI failure and explain each component's AWS permissions.
+
+### Checkpoint 8 — Terraform, monitoring and recovery
+
+**Build:** small Terraform configuration for declared demo resources with manual prerequisites documented, safe state handling, limited Prometheus metrics, one Grafana dashboard, structured logs, backup/restore and cleanup instructions.
+
+**Demonstrate:**
+
+- Inspect a plan and recreate a disposable environment once without destroying valuable data.
+- Explain any changes in a follow-up plan.
+- Inject an API error or stalled task; identify it through metrics plus logs.
+- Restore a backup into a separate database and verify representative records/relationships.
+- Record resource size, runtime/cost observation window and cleanup result; do not invent savings or throughput claims.
+
+**Ownership exercise:** explain state, latency/error metrics, label cardinality, a recovery limitation and the cost of idle cloud resources.
+
+These are small exercises around one app. Optional brokers, Kubernetes and extra CI systems do not belong in this checkpoint.
+
+## 5. Final checkpoint: release, ownership and résumé
+
+### Checkpoint 9 — V1 release review
+
+1. Run recorded acceptance scenarios against a known code revision.
+2. Reconcile current architecture, setup and IMPLEMENTED.md with actual behavior.
+3. Walk through the [completion gate](v1-scope.md#6-v1-completion-gate).
+4. Harsha explains and modifies critical paths; unresolved understanding gaps remain unfinished work.
+5. Prepare a stable release reference, short demo and evidence-backed résumé draft.
+6. Harsha personally signs off on completion and updates the résumé using verified claims.
+7. Begin applications/interview preparation. Pause new features until Harsha selects the next increment.
+
+An assistant may report that the evidence is ready for review. It must not invent Harsha's signoff or continue to V2 on its own. Full business launch and optional labs are not release conditions.
+
+### Five-minute V1 demo
+
+| Time | Show |
 |---|---|
-| 1.1 Develop on AWS | Sync commands, async work, SDK integration, event patterns, resilient AI/payment adapters, tests |
-| 1.2 Lambda | Memory, timeouts, concurrency, triggers, destinations, error handling, performance |
-| 1.3 Data stores | Access-pattern design, indexes, consistency, serialisation, backups, lifecycle, caching |
-| 2.1 AuthN/AuthZ | Cognito, JWT validation, operator roles, ownership checks, assumed roles, CI OIDC |
-| 2.2 Encryption | TLS, S3/DynamoDB encryption, device certificates, KMS key policies |
-| 2.3 Sensitive data | Private photos, Secrets Manager, redacted logs, restricted exports |
-| 3.1 Deployment artifacts | Locked dependencies, Lambda packages, container images, env config |
-| 3.2 Dev testing | SAM/staging tests, provider simulators, duplicate and reordered events |
-| 3.3 Deployment testing | Isolated environments, versioned fixtures, aliases, IaC checks |
-| 3.4 CI/CD | Build/test/deploy pipeline, promotion, canary/blue-green, rollback |
-| 4.1 Root cause | Failed uploads, dispatch, callbacks, deployments |
-| 4.2 Instrumentation | Logs, metrics, traces, health checks, alarms, correlation |
-| 4.3 Optimisation | Concurrency, profiling, caching, cost, sizing, bottlenecks |
+| 0:00–0:45 | Problem, scope and architecture; identify simulated printer and test payment |
+| 0:45–1:30 | Request, reviewed revision, quote and accepted order; use prepared fixtures where needed |
+| 1:30–2:15 | Verified test payment and separate operator release |
+| 2:15–3:15 | Duplicate command and lost acknowledgement; why uncertain work stays held |
+| 3:15–4:00 | Reconciliation, bed clearance, QC and handoff |
+| 4:00–5:00 | Test, CI, deployment and dashboard/restore evidence; explain limitations |
 
-Isolated labs, kept out of production:
+Keep an offline recording and sanitized fixtures so a temporary cloud or sandbox outage does not prevent explaining the project. A recording supports the demo; it does not replace runnable code or understanding.
 
-- VPC access from Lambda;
-- cross-account KMS;
-- OpenSearch compared with simpler search;
-- CodeBuild/CodePipeline/CodeDeploy;
-- AppConfig rollout;
-- cache invalidation;
-- alternative deployment strategies.
+## 6. Optional labs after V1
 
-These live in `labs/certification/`.
+Select one for a specific learning goal or target role. Each needs a bounded exercise, failure case, cleanup instructions and its own evidence entry.
 
-## 5. Five-minute demo
+Suggested order if relevant: RabbitMQ notification worker → Ansible setup or Jenkins CI comparison → local Kubernetes → Kafka replay.
 
-| Time | Segment |
-|---|---|
-| 0:00–0:40 | **The product.** A real finished object and its order record. |
-| 0:40–1:20 | **Approval and traceability.** The approved revision, parts list, manufacturing profile and quote, with filament costed from the rate card. |
-| 1:20–2:10 | **Dispatch.** Assign a simulated or real supervised job. Show the immutable command ID and durable edge acknowledgement. |
-| 2:10–3:00 | **Failure.** Deliver the command twice: no second start. Disconnect the bridge mid-print: ownership is held because the physical state is uncertain. |
-| 3:00–3:40 | **Recovery.** Reconnect and reconcile. A confirmed failed attempt becomes an authorised reprint, and the original material and time are kept. |
-| 3:40–4:20 | **Operations.** Real labour, first-pass yield, queue time and contribution for a measured period. |
-| 4:20–5:00 | **Material history.** Intake, credit entry, transfer, recovery receipt. Mark demo data as synthetic if PrintBack isn't live. |
+There is no obligation to complete this list. Labs stay separate unless Harsha explicitly approves an integration scope. Describe actual lab experience on the résumé rather than claiming those tools powered V1.
 
-The sustainability sequence is: measured intake → accepted/rejected weights → credit transaction → material movement → partner receipt → qualified output → product incorporation → dashboard update. The dashboard changes only as supporting evidence arrives.
+## 7. V2 and later: business-driven increments
 
-## 6. Resume evidence (placeholders until measured)
+V2 begins after the V1 résumé checkpoint and a new request from Harsha. Reuse sound code and boundaries; change simplified assumptions through deliberate migrations and tests.
 
-- Built an AWS manufacturing application connecting [N] printers and tracking [N] physical production attempts.
-- Implemented durable edge commands and reconciliation, verified through [documented failure scenarios].
-- Reduced operator scheduling time from [baseline] to [result] across [sample size] jobs.
-- Tracked [kg] of material through intake, inventory, processing and verified use.
-- Measured infrastructure cost of [amount] per accepted job under [documented workload].
+| Candidate increment | Evidence that justifies it | First bounded delivery |
+|---|---|---|
+| Richer custom work | Actual requests exceed V1 limits | Larger reliable uploads and multi-file requirements with constrained validation |
+| Multi-part manufacturing | A real product requires multiple plates/components | Required quantities, accepted output and assembly prerequisites for one product |
+| Real printer integration | Supported interface and supervised recovery are verified | Read-only monitoring, then separately approved supervised dispatch |
+| Small-farm scheduling | Multiple machines and competing work exist | Manual assignment aided by an explainable queue policy |
+| Paid business operation | Commercial, privacy, support and recovery requirements are ready | Live payments and a narrow offer; reassess hosting resilience |
+| Inventory/costing | Reliable actual production data exists | Material consumption and operator effort for one repeatable process |
+| Broker/richer telemetry | Current transport has a measured limitation | One justified integration with failure/recovery tests |
+| Bed automation | Measured operator delay supports the investment | One qualified workflow with explicit failure handling |
+| PrintBack/recycling | Real collection, funding and material routes exist | Separate bounded pilot; never a V1 dependency |
 
-Publish the measurement window, definitions, code version and sample size. Keep simulated concurrency separate from manufactured output.
-
-In interviews, be ready to explain:
-
-- why "exactly once" is hard around physical machines;
-- how double spending and duplicate production were prevented;
-- why each access pattern was chosen;
-- how approval versions constrain manufacturing;
-- how failures affect real costs;
-- how collection was distinguished from verified recovery.
+Define the business problem, scope, risks, demo and completion gate for each increment before implementation. Revisit résumé claims after each completed increment. Do not migrate to microservices, Kubernetes or managed messaging just to make V2 look more complex.

@@ -2,6 +2,8 @@
 
 Status: draft · Last reviewed: 2026-09-30
 
+> **Future business strategy — V2 and later.** Scope classification updated 2026-10-07; the financial assumptions retain their original review date. Current software work follows the bounded [hiring-focused V1](v1-scope.md), whose completion does not depend on real sales, more printers, inventory, recycling or this plan's full workflow. See [target architecture](target-architecture.md) for later increments.
+
 Build One3D as a focused custom-manufacturing business under OneCreations. Use PrintFlow to run it. Introduce PrintBack through recycling partners once the core business works. The existing Bambu X1C is enough to validate the business and to build a substantial engineering project.
 
 With ₹3–4 lakh covering the whole first year, plan around 2–4 productive printers at first. Treat 10–12 printers as an expansion paid for by demonstrated demand and retained earnings. Buy more machines only once there is evidence that printing is the bottleneck.
@@ -258,7 +260,7 @@ This is the first material rate-card version, as of 2026-09-30:
 
 - These are purchase prices, treated as GST-inclusive, and no input tax credit is assumed. If One3D registers for GST and can claim input credit, PLA+ costs about ₹551/kg net. Confirm with a CA.
 - PETG costs the same as PLA+ but needs drying and dry storage. Keep PETG scrap separate from PLA, and never mix it with PET bottle stock. See [PrintBack](printback.md#6-material-streams-and-routes).
-- PrintFlow stores these rates as versioned paise-per-kg values on each material lot, so every order's cost uses the rate that applied when it was made. See [ARCHITECTURE.md §8](../ARCHITECTURE.md#8-data-design).
+- Future material accounting would store versioned paise-per-kg rates on material lots so an order's recorded cost uses the applicable rate. This is unimplemented and outside V1; see [target architecture](target-architecture.md).
 
 ## 8. Unit economics (illustrative)
 

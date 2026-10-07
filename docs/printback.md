@@ -2,7 +2,9 @@
 
 Status: draft · not operating · Last reviewed: 2026-09-30
 
-PrintBack is One3D's future take-back and material-recovery program. It launches publicly only once a real collection route, buyer and funded rewards budget exist. Until then, its software is tested with clearly labelled synthetic data.
+> **Deferred beyond V1.** Scope classification updated 2026-10-07. Collection software, rewards, credit ledgers and synthetic recycling demonstrations are not required for the [hiring-focused V1](v1-scope.md). This document preserves future business research, not current implementation instructions.
+
+PrintBack is One3D's future take-back and material-recovery program. It launches publicly only once a real collection route, buyer and funded rewards budget exist. Its software has not been implemented or tested here. Any later prototype must use clearly labelled synthetic data until real operations and their evidence exist.
 
 ## 1. Start as a bounded program
 
