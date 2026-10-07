@@ -1,0 +1,8 @@
+$ docker compose exec -T db psql -U one3d -d one3d -c "UPDATE product_configuration SET price_minor = 59900 WHERE code = 'HEX-ORG-PLA-BLACK'"
+UPDATE 1
+$ curl -s http://127.0.0.1:8080/api/orders/4af6c30c-5288-446a-89b5-2bbcf1bd8702
+{"id":"4af6c30c-5288-446a-89b5-2bbcf1bd8702","status":"AWAITING_PAYMENT","createdAt":"2026-10-07T08:06:54.575393Z","line":{"productConfigurationId":"0d3d0000-0000-4000-8000-000000000002","productName":"Hex Desk Organizer (demo)","configurationCode":"HEX-ORG-PLA-BLACK","configurationDescription":"Matte black PLA+, 0.20 mm layers, single plate","recipeRevisionId":"0d3d0000-0000-4000-8000-000000000003","recipeRevisionNumber":1,"quantity":1,"unitPrice":{"amountMinor":49900,"currency":"INR"}},"total":{"amountMinor":49900,"currency":"INR"}}
+$ curl -s http://127.0.0.1:8080/api/catalog/configurations
+[{"configurationId":"0d3d0000-0000-4000-8000-000000000002","productName":"Hex Desk Organizer (demo)","configurationCode":"HEX-ORG-PLA-BLACK","description":"Matte black PLA+, 0.20 mm layers, single plate","price":{"amountMinor":59900,"currency":"INR"},"recipeRevisionNumber":1}]
+$ (restore seed price) UPDATE product_configuration SET price_minor = 49900 WHERE code = 'HEX-ORG-PLA-BLACK'
+UPDATE 1

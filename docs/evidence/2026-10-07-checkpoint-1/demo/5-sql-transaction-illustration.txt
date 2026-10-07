@@ -1,0 +1,42 @@
+INSERT INTO customer_order (id, status, created_at)
+VALUES ('aaaaaaaa-0000-4000-8000-000000000001', 'AWAITING_PAYMENT', now());
+INSERT 0 1
+INSERT INTO order_line (id, order_id, product_configuration_id, recipe_revision_id, product_name,
+                        configuration_code, configuration_description, recipe_revision_number,
+                        quantity, unit_price_minor, currency)
+VALUES (gen_random_uuid(), 'aaaaaaaa-0000-4000-8000-000000000001',
+        '0d3d0000-0000-4000-8000-000000000002', '0d3d0000-0000-4000-8000-000000000003',
+        'Hex Desk Organizer (demo)', 'HEX-ORG-PLA-BLACK', 'x', 1, 2, 49900, 'INR');
+SELECT count(*) AS orders_without_line FROM customer_order o
+WHERE NOT EXISTS (SELECT 1 FROM order_line l WHERE l.order_id = o.id);
+ERROR:  new row for relation "order_line" violates check constraint "order_line_quantity_is_one"
+DETAIL:  Failing row contains (fa640999-b272-4bac-9a2e-8cf18ea99c6c, aaaaaaaa-0000-4000-8000-000000000001, 0d3d0000-0000-4000-8000-000000000002, 0d3d0000-0000-4000-8000-000000000003, Hex Desk Organizer (demo), HEX-ORG-PLA-BLACK, x, 1, 2, 49900, INR).
+ orders_without_line 
+---------------------
+                   1
+(1 row)
+
+DELETE FROM customer_order WHERE id = 'aaaaaaaa-0000-4000-8000-000000000001';
+DELETE 1
+BEGIN;
+BEGIN
+INSERT INTO customer_order (id, status, created_at)
+VALUES ('aaaaaaaa-0000-4000-8000-000000000002', 'AWAITING_PAYMENT', now());
+INSERT 0 1
+INSERT INTO order_line (id, order_id, product_configuration_id, recipe_revision_id, product_name,
+                        configuration_code, configuration_description, recipe_revision_number,
+                        quantity, unit_price_minor, currency)
+VALUES (gen_random_uuid(), 'aaaaaaaa-0000-4000-8000-000000000002',
+        '0d3d0000-0000-4000-8000-000000000002', '0d3d0000-0000-4000-8000-000000000003',
+        'Hex Desk Organizer (demo)', 'HEX-ORG-PLA-BLACK', 'x', 1, 2, 49900, 'INR');
+ERROR:  new row for relation "order_line" violates check constraint "order_line_quantity_is_one"
+DETAIL:  Failing row contains (1e758b10-6d99-45fd-9da4-41ea6e9b45c4, aaaaaaaa-0000-4000-8000-000000000002, 0d3d0000-0000-4000-8000-000000000002, 0d3d0000-0000-4000-8000-000000000003, Hex Desk Organizer (demo), HEX-ORG-PLA-BLACK, x, 1, 2, 49900, INR).
+COMMIT;
+ROLLBACK
+SELECT count(*) AS orders_without_line FROM customer_order o
+WHERE NOT EXISTS (SELECT 1 FROM order_line l WHERE l.order_id = o.id);
+ orders_without_line 
+---------------------
+                   0
+(1 row)
+

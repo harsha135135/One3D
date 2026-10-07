@@ -40,7 +40,7 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home ./mvnw 
 | Failsafe | `orders.OrderAtomicityIT` | 2 | 2 passed |
 | **Total** | | **27** | **27 passed, 0 failed, 0 skipped** |
 
-The reports are generated in `backend/target/surefire-reports/` and `backend/target/failsafe-reports/`. The build output isn't committed. `failsafe-summary.xml` recorded `completed=24, errors=0, failures=0, skipped=0, flakes=0`.
+The per-class reports and `failsafe-summary.xml` from this run are kept in [`2026-10-07-checkpoint-1/test-reports/`](2026-10-07-checkpoint-1/test-reports/). They are copied from `backend/target/`, which `clean` deletes. The XML reports aren't kept because they embed local paths and system properties. `failsafe-summary.xml` recorded `completed=24, errors=0, failures=0, skipped=0, flakes=0`.
 
 What the integration tests cover:
 
@@ -85,7 +85,7 @@ What the integration tests cover:
 
 ## 2. Manual demonstration: run, change catalog, restart, retrieve
 
-The steps ran on a working tree with the same content as `0fb442e`; I committed straight afterwards with no edits in between. The commands were run from the repository root and from `backend/`.
+The steps ran on a working tree with the same content as `0fb442e`; I committed straight afterwards with no edits in between. The commands were run from the repository root and from `backend/`. The terminal transcripts are in [`2026-10-07-checkpoint-1/demo/`](2026-10-07-checkpoint-1/demo/). Application logs weren't kept.
 
 1. `docker compose up -d db`: the container reported healthy. `docker compose ps` showed `127.0.0.1:5433->5432/tcp` and PostgreSQL 17.11.
 2. `./mvnw spring-boot:run`: Flyway logged `Successfully applied 2 migrations to schema "public", now at version v2`. The app started in 2.396 s and `lsof` showed `java … TCP 127.0.0.1:8080 (LISTEN)`.
