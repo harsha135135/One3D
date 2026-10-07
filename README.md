@@ -2,9 +2,9 @@
 
 **V1: a focused Java backend portfolio project, built to demonstrate fresher-level engineering skills.**
 
-One3D is the planned custom-manufacturing business of [OneCreations](https://github.com/harsha135135/OneCreations). Its operating software is called **PrintFlow**. This repository currently contains design documents; application code, infrastructure and automated tests have not been implemented or verified.
+One3D is the planned custom-manufacturing business of [OneCreations](https://github.com/harsha135135/OneCreations). Its operating software is called **PrintFlow**. Checkpoint 1 of V1 (a catalog order API on Spring Boot and PostgreSQL) is implemented and tested locally. Later checkpoints, infrastructure and deployment are not implemented yet.
 
-Status: planning · Scope updated: 2026-10-07
+Status: Checkpoint 1 implemented and tested locally; owner review pending · Scope updated: 2026-10-07
 
 ## What we are building first
 
@@ -43,13 +43,50 @@ The latest explicit owner instruction takes precedence. Otherwise, `docs/v1-scop
 
 These are planned choices, not claims of hands-on experience. The [scope](docs/v1-scope.md) defines the minimum evidence for each required tool. **Ansible, Jenkins, RabbitMQ, Kafka and local Kubernetes are optional labs.** They must not become prerequisites for finishing V1. There is no required microservice split, message broker, Kubernetes cluster or multi-region deployment.
 
+## Run Checkpoint 1 locally
+
+These commands were run on 2026-10-07; results are in the [Checkpoint 1 evidence](docs/evidence/2026-10-07-checkpoint-1.md).
+
+**Prerequisites:** JDK 21 (checked with 21.0.12; point `JAVA_HOME` at it if your default JDK differs) and a running Docker daemon. Maven is not required: use the included `./mvnw` wrapper.
+
+```bash
+# 1. Start the local PostgreSQL database (published on 127.0.0.1:5433 only)
+docker compose up -d db
+
+# 2. From backend/, run the unit tests (Surefire) and the PostgreSQL
+#    integration tests (*IT, Failsafe + Testcontainers)
+cd backend
+./mvnw verify
+
+# 3. Start the API on http://127.0.0.1:8080 (Ctrl+C to stop)
+./mvnw spring-boot:run
+```
+
+The integration tests start their own disposable PostgreSQL container, so step 2 does not need step 1. Stop the local database with `docker compose stop`; its data stays in the `one3d-db` volume.
+
+| Method and path | Purpose |
+|---|---|
+| `GET /api/catalog/configurations` | List orderable configurations (one seeded demo item) |
+| `POST /api/orders` | Place a one-line order: `{"productConfigurationId": "…", "quantity": 1}` returns 201 and a `Location` header |
+| `GET /api/orders/{id}` | Read an order and its catalog snapshot |
+
+```bash
+curl -s -X POST http://127.0.0.1:8080/api/orders \
+  -H "Content-Type: application/json" \
+  -d '{"productConfigurationId":"0d3d0000-0000-4000-8000-000000000002","quantity":1}'
+```
+
+More requests, including invalid ones, are in [`backend/api.http`](backend/api.http). Errors are `application/problem+json` responses with a stable `code` (for example `VALIDATION_FAILED`, `CONFIGURATION_NOT_ORDERABLE` or `ORDER_NOT_FOUND`).
+
+Checkpoint 1 has **no authentication**. For that reason the API listens on 127.0.0.1 and the database port is published on localhost only. Do not expose either until identity (Checkpoint 4) and the proxy (Checkpoint 7) exist.
+
 ## V1 completion and the next step
 
 V1 is complete only when the required workflow, failure tests, CI/deployment/restore checks and documentation work, and Harsha can explain, change and debug the critical code. The owner then accepts V1 and updates the résumé using recorded evidence. An agent cannot approve the owner's understanding on their behalf.
 
 After that gate, agree one small V2 increment based on real business needs. Do not start implementing the full future architecture simply because V1 code builds.
 
-There are no application run commands yet. Add verified setup, run, test and demo commands when the relevant code exists; do not present planned commands as runnable instructions.
+Add run, test and demo commands for later checkpoints only after they have been verified. Do not present planned commands as runnable instructions.
 
 ## Websites and brand
 
