@@ -31,19 +31,60 @@ class ProductionJobTest {
     }
 
     @Test
-    void startingAnAttemptReservesThePrinterAndOccupiesTheBed() {
+    void startingRecordsTheIntentAndReservesThePrinterAndBed() {
         PrintAttempt attempt = job.startAttempt(printer, NOW);
 
         assertThat(job.getStatus()).isEqualTo(JobStatus.PRINTING);
         assertThat(attempt.getAttemptNumber()).isEqualTo(1);
-        assertThat(attempt.getStatus()).isEqualTo(AttemptStatus.RUNNING);
+        assertThat(attempt.getStatus()).isEqualTo(AttemptStatus.START_INTENT);
         assertThat(printer.getCurrentAttemptId()).isEqualTo(attempt.getId());
         assertThat(printer.getBedState()).isEqualTo(BedState.OCCUPIED);
+        assertThat(printer.getBedCycleAttemptId()).isEqualTo(attempt.getId());
     }
 
     @Test
-    void completionNeedsQcAndLeavesTheBedOccupied() {
+    void anUncertainStartKeepsThePrinterAndJobUntilConfirmed() {
         PrintAttempt attempt = job.startAttempt(printer, NOW);
+
+        job.startOutcomeUnknown(attempt);
+
+        assertThat(attempt.getStatus()).isEqualTo(AttemptStatus.RECONCILIATION_REQUIRED);
+        assertThat(job.getStatus()).isEqualTo(JobStatus.PRINTING);
+        assertThat(printer.getCurrentAttemptId()).isEqualTo(attempt.getId());
+        ProductionJob other = ProductionJob.release(UUID.randomUUID(), UUID.randomUUID(), NOW);
+        assertThatThrownBy(() -> other.startAttempt(printer, NOW))
+                .isInstanceOf(ConflictException.class)
+                .extracting("code").isEqualTo("PRINTER_BUSY");
+
+        job.confirmStarted(attempt);
+        assertThat(attempt.getStatus()).isEqualTo(AttemptStatus.RUNNING);
+    }
+
+    @Test
+    void aRefusedStartIsUndoneAndDoesNotCountTowardTheLimit() {
+        PrintAttempt refused = job.startAttempt(printer, NOW);
+
+        job.rejectBeforeStart(refused, printer, "Refused by the printer: REJECTED_BUSY", NOW);
+
+        assertThat(refused.getStatus()).isEqualTo(AttemptStatus.REJECTED_BEFORE_START);
+        assertThat(job.getStatus()).isEqualTo(JobStatus.RELEASED);
+        assertThat(printer.getCurrentAttemptId()).isNull();
+        assertThat(printer.getBedState()).isEqualTo(BedState.CLEAR);
+        assertThat(printer.getBedCycleAttemptId()).isNull();
+
+        // Three attempts that did reach the printer are still allowed.
+        for (int i = 0; i < ProductionJob.MAX_ATTEMPTS; i++) {
+            failAndClear(job.startAttempt(printer, NOW));
+        }
+        assertThat(job.getAttempts()).extracting(PrintAttempt::getAttemptNumber).containsExactly(1, 2, 3, 4);
+        assertThatThrownBy(() -> job.startAttempt(printer, NOW))
+                .isInstanceOf(ConflictException.class)
+                .extracting("code").isEqualTo("ATTEMPT_LIMIT_REACHED");
+    }
+
+    @Test
+    void completionNeedsQcAndLeavesThePrintOnTheBed() {
+        PrintAttempt attempt = running(job.startAttempt(printer, NOW));
 
         job.completeAttempt(attempt, printer, NOW);
 
@@ -51,11 +92,12 @@ class ProductionJobTest {
         assertThat(attempt.getStatus()).isEqualTo(AttemptStatus.COMPLETED);
         assertThat(printer.getCurrentAttemptId()).isNull();
         assertThat(printer.getBedState()).isEqualTo(BedState.OCCUPIED);
+        assertThat(printer.getBedCycleAttemptId()).isEqualTo(attempt.getId());
     }
 
     @Test
     void failureKeepsTheAttemptAndARetryIsAttemptTwo() {
-        PrintAttempt first = job.startAttempt(printer, NOW);
+        PrintAttempt first = running(job.startAttempt(printer, NOW));
         job.failAttempt(first, printer, "Nozzle clog", NOW);
 
         assertThat(job.getStatus()).isEqualTo(JobStatus.RELEASED);
@@ -63,17 +105,17 @@ class ProductionJobTest {
         assertThat(first.getFailureReason()).isEqualTo("Nozzle clog");
         assertThat(printer.getBedState()).isEqualTo(BedState.OCCUPIED);
 
-        printer.clearBed(NOW);
+        printer.clearBed(first.getId(), NOW);
         PrintAttempt second = job.startAttempt(printer, NOW);
 
         assertThat(second.getAttemptNumber()).isEqualTo(2);
         assertThat(job.getAttempts()).extracting(PrintAttempt::getStatus)
-                .containsExactly(AttemptStatus.FAILED, AttemptStatus.RUNNING);
+                .containsExactly(AttemptStatus.FAILED, AttemptStatus.START_INTENT);
     }
 
     @Test
     void anOccupiedBedBlocksTheNextStartAndLeavesTheJobUnchanged() {
-        PrintAttempt first = job.startAttempt(printer, NOW);
+        PrintAttempt first = running(job.startAttempt(printer, NOW));
         job.failAttempt(first, printer, "Warping", NOW);
 
         assertThatThrownBy(() -> job.startAttempt(printer, NOW))
@@ -84,10 +126,25 @@ class ProductionJobTest {
     }
 
     @Test
-    void aFourthAttemptIsRejectedAndChangesNothing() {
+    void aClearanceMustNameThePrintOnTheBed() {
+        PrintAttempt first = running(job.startAttempt(printer, NOW));
+        job.failAttempt(first, printer, "Warping", NOW);
+        printer.clearBed(first.getId(), NOW);
+        PrintAttempt second = running(job.startAttempt(printer, NOW));
+        job.failAttempt(second, printer, "Spaghetti", NOW);
+
+        // A delayed clearance for the first print must not clear the second.
+        assertThatThrownBy(() -> printer.clearBed(first.getId(), NOW))
+                .isInstanceOf(ConflictException.class)
+                .extracting("code").isEqualTo("STALE_CLEARANCE");
+        assertThat(printer.getBedState()).isEqualTo(BedState.OCCUPIED);
+        assertThat(printer.getBedCycleAttemptId()).isEqualTo(second.getId());
+    }
+
+    @Test
+    void aFourthCountedAttemptIsRejectedAndChangesNothing() {
         for (int i = 0; i < ProductionJob.MAX_ATTEMPTS; i++) {
-            job.failAttempt(job.startAttempt(printer, NOW), printer, "Warping", NOW);
-            printer.clearBed(NOW);
+            failAndClear(job.startAttempt(printer, NOW));
         }
 
         // A later instant, so a bed change would show in bedStateChangedAt.
@@ -103,7 +160,7 @@ class ProductionJobTest {
 
     @Test
     void passingQcAcceptsTheJob() {
-        PrintAttempt attempt = job.startAttempt(printer, NOW);
+        PrintAttempt attempt = running(job.startAttempt(printer, NOW));
         job.completeAttempt(attempt, printer, NOW);
 
         job.recordQc(attempt, QcResult.PASSED, null, NOW);
@@ -115,7 +172,7 @@ class ProductionJobTest {
 
     @Test
     void failingQcRequiresAnotherAttemptAndBlocksHandoff() {
-        PrintAttempt attempt = job.startAttempt(printer, NOW);
+        PrintAttempt attempt = running(job.startAttempt(printer, NOW));
         job.completeAttempt(attempt, printer, NOW);
 
         job.recordQc(attempt, QcResult.FAILED, "Layer shift", NOW);
@@ -128,7 +185,7 @@ class ProductionJobTest {
 
     @Test
     void aRunningAttemptCannotBeInspected() {
-        PrintAttempt attempt = job.startAttempt(printer, NOW);
+        PrintAttempt attempt = running(job.startAttempt(printer, NOW));
 
         assertThatThrownBy(() -> job.recordQc(attempt, QcResult.PASSED, null, NOW))
                 .isInstanceOf(ConflictException.class)
@@ -136,8 +193,17 @@ class ProductionJobTest {
     }
 
     @Test
-    void anEndedAttemptCannotEndAgain() {
+    void anUnconfirmedStartCannotComplete() {
         PrintAttempt attempt = job.startAttempt(printer, NOW);
+
+        assertThatThrownBy(() -> job.completeAttempt(attempt, printer, NOW))
+                .isInstanceOf(ConflictException.class)
+                .extracting("code").isEqualTo("ATTEMPT_NOT_STARTED");
+    }
+
+    @Test
+    void anEndedAttemptCannotEndAgain() {
+        PrintAttempt attempt = running(job.startAttempt(printer, NOW));
         job.completeAttempt(attempt, printer, NOW);
 
         assertThatThrownBy(() -> job.failAttempt(attempt, printer, "late failure", NOW))
@@ -148,10 +214,21 @@ class ProductionJobTest {
 
     @Test
     void theBedCannotBeClearedWhilePrinting() {
-        job.startAttempt(printer, NOW);
+        PrintAttempt attempt = running(job.startAttempt(printer, NOW));
 
-        assertThatThrownBy(() -> printer.clearBed(NOW))
+        assertThatThrownBy(() -> printer.clearBed(attempt.getId(), NOW))
                 .isInstanceOf(ConflictException.class)
                 .extracting("code").isEqualTo("PRINTER_BUSY");
+    }
+
+    private PrintAttempt running(PrintAttempt attempt) {
+        job.confirmStarted(attempt);
+        return attempt;
+    }
+
+    private void failAndClear(PrintAttempt attempt) {
+        job.confirmStarted(attempt);
+        job.failAttempt(attempt, printer, "Warping", NOW);
+        printer.clearBed(attempt.getId(), NOW);
     }
 }

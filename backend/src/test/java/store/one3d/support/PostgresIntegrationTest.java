@@ -15,11 +15,17 @@ import java.lang.annotation.Target;
  * uses the same annotation, so Spring caches one context and one container
  * for the whole run instead of starting a new database per class.
  * The "demo" profile enables the simulated-payment shortcut that the
- * production tests use to confirm orders.
+ * production tests use to confirm orders. The printer simulator runs as a
+ * separate container (see {@link TestcontainersConfiguration}).
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-@SpringBootTest
+@SpringBootTest(properties = {
+        // Tests drive the dispatch worker and observer explicitly (runOnce /
+        // observeOnce) so no background thread picks up another test's rows.
+        "one3d.worker.enabled=false",
+        "one3d.worker.retry-backoff=0s",
+        "one3d.simulator.request-timeout=2s"})
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 @ActiveProfiles("demo")

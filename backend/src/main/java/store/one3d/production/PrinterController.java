@@ -1,8 +1,10 @@
 package store.one3d.production;
 
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -26,7 +28,7 @@ class PrinterController {
     }
 
     @PostMapping("/{printerId}/clear-bed")
-    PrinterResponse clearBed(@PathVariable UUID printerId) {
-        return productionService.clearBed(printerId);
+    PrinterResponse clearBed(@PathVariable UUID printerId, @Valid @RequestBody ClearBedRequest request) {
+        return productionService.clearBed(printerId, request.attemptId());
     }
 }
