@@ -71,7 +71,7 @@ The integration tests start their own disposable PostgreSQL container, so step 2
 | Method and path | Purpose |
 |---|---|
 | `GET /api/catalog/configurations` | List orderable configurations (one seeded demo item) |
-| `POST /api/orders` | Place a one-line order: `{"productConfigurationId": "…", "quantity": 1}` returns 201 and a `Location` header. `quantity` may be omitted or null (it defaults to 1); any other value returns 400 |
+| `POST /api/orders` | Place a one-line order: `{"productConfigurationId": "…", "quantity": 1}` returns 201 and a `Location` header. `quantity` may be omitted or null (it defaults to 1); any other value, including a fractional number such as `1.5`, returns 400 |
 | `GET /api/orders/{id}` | Read an order and its catalog snapshot |
 
 Operator production endpoints (Checkpoint 2). `/api/ops` is a grouping, not access control:
