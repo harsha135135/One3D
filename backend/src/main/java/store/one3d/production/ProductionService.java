@@ -3,6 +3,8 @@ package store.one3d.production;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import store.one3d.background.PendingWorkStore;
+import store.one3d.background.WorkKind;
 import store.one3d.common.ConflictException;
 import store.one3d.common.NotFoundException;
 import store.one3d.common.Timestamps;
@@ -95,7 +97,7 @@ public class ProductionService {
         UUID clearedAttemptId = clearance.map(BedClearance::getClearedAttemptId).orElse(null);
         PrinterCommand command = commands.saveAndFlush(
                 PrinterCommand.start(attempt, job.getRecipeRevisionId(), clearedAttemptId, now));
-        work.enqueueDispatch(command.getId(), maxDispatchTries);
+        work.enqueue(WorkKind.DISPATCH_START, command.getId(), maxDispatchTries);
         return JobResponse.from(job);
     }
 
@@ -117,7 +119,7 @@ public class ProductionService {
         PrintAttempt attempt = findAttempt(attemptId);
         PrinterCommand command = commands.findByAttemptId(attemptId).orElseThrow(() -> new ConflictException(
                 "NOTHING_TO_RECONCILE", "Attempt " + attemptId + " has no start command."));
-        if (work.requeueExhausted(command.getId()) == 0) {
+        if (work.requeueExhausted(WorkKind.DISPATCH_START, command.getId()) == 0) {
             throw new ConflictException("NOTHING_TO_RECONCILE",
                     "Attempt " + attemptId + " has no exhausted delivery to retry.");
         }
@@ -152,7 +154,7 @@ public class ProductionService {
         return PrinterResponse.from(printer);
     }
 
-    /** Delivery work in a given state, for example EXHAUSTED work that needs an operator. */
+    /** Background work in a given state, for example EXHAUSTED work that needs an operator. */
     @Transactional(readOnly = true)
     public List<PendingWorkStore.WorkView> listWork(String status) {
         return work.list(status);

@@ -116,10 +116,10 @@ class DatabaseConstraintsIT {
 
     private void insertLine(UUID orderId, UUID recipeRevisionId, Integer quantity) {
         jdbc.sql("""
-                        INSERT INTO order_line (id, order_id, product_configuration_id, recipe_revision_id,
+                        INSERT INTO order_line (id, order_id, source, product_configuration_id, recipe_revision_id,
                                                 product_name, configuration_code, configuration_description,
                                                 recipe_revision_number, quantity, unit_price_minor, currency)
-                        VALUES (?, ?, ?, ?, 'Constraint Test Cube', 'TEST', 'Test', 1, ?, 10000, 'INR')
+                        VALUES (?, ?, 'CATALOG', ?, ?, 'Constraint Test Cube', 'TEST', 'Test', 1, ?, 10000, 'INR')
                         """)
                 .params(UUID.randomUUID(), orderId, item.configurationId(), recipeRevisionId, quantity)
                 .update();

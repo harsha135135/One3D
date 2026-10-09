@@ -3,6 +3,7 @@ package store.one3d.production;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import store.one3d.background.BackgroundJob;
 
 import java.util.UUID;
 
@@ -12,7 +13,7 @@ import java.util.UUID;
  * poll tries again.
  */
 @Component
-public class ExecutionObserver {
+public class ExecutionObserver implements BackgroundJob {
 
     private static final Logger log = LoggerFactory.getLogger(ExecutionObserver.class);
 
@@ -22,6 +23,11 @@ public class ExecutionObserver {
     ExecutionObserver(DispatchOutcomes outcomes, SimulatorClient simulator) {
         this.outcomes = outcomes;
         this.simulator = simulator;
+    }
+
+    @Override
+    public int runOnce() {
+        return observeOnce();
     }
 
     /** Returns the number of running attempts checked. */

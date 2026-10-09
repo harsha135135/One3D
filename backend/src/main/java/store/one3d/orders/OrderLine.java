@@ -2,6 +2,8 @@ package store.one3d.orders;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -31,8 +33,14 @@ class OrderLine {
     @JoinColumn(name = "order_id")
     private CustomerOrder order;
 
+    @Enumerated(EnumType.STRING)
+    private LineSource source;
+
     @Column(name = "product_configuration_id")
     private UUID productConfigurationId;
+
+    @Column(name = "quote_id")
+    private UUID quoteId;
 
     @Column(name = "recipe_revision_id")
     private UUID recipeRevisionId;
@@ -62,6 +70,7 @@ class OrderLine {
 
     OrderLine(CustomerOrder order, CatalogSnapshot item, int quantity) {
         this.order = order;
+        this.source = LineSource.CATALOG;
         this.productConfigurationId = item.configurationId();
         this.recipeRevisionId = item.recipeRevisionId();
         this.productName = item.productName();
@@ -71,6 +80,14 @@ class OrderLine {
         this.quantity = quantity;
         this.unitPriceMinor = item.unitPriceMinor();
         this.currency = item.currency();
+    }
+
+    LineSource getSource() {
+        return source;
+    }
+
+    UUID getQuoteId() {
+        return quoteId;
     }
 
     UUID getProductConfigurationId() {

@@ -29,7 +29,7 @@ class SchemaMigrationIT {
                 .query(String.class)
                 .list();
 
-        assertThat(applied).containsExactly("1", "2", "3", "4", "5", "6");
+        assertThat(applied).containsExactly("1", "2", "3", "4", "5", "6", "7");
     }
 
     @Test

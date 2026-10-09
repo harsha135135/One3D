@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import store.one3d.background.PendingWorkStore;
 import store.one3d.common.Timestamps;
 
 import java.time.Duration;
@@ -65,7 +66,7 @@ class DispatchOutcomes {
             return false;
         }
 
-        PrinterCommand command = commands.findById(claimed.commandId()).orElseThrow();
+        PrinterCommand command = commands.findById(claimed.subjectId()).orElseThrow();
         PrintAttempt attempt = attempts.findWithJob(command.getAttemptId()).orElseThrow();
         ProductionJob job = attempt.getJob();
         Instant now = Timestamps.now();

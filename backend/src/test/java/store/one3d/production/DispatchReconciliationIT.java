@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
+import store.one3d.background.PendingWorkStore;
+import store.one3d.background.WorkKind;
 import store.one3d.support.ApiSteps;
 import store.one3d.support.PostgresIntegrationTest;
 import store.one3d.support.ProductionFixtures;
@@ -255,8 +257,8 @@ class DispatchReconciliationIT {
 
     private PendingWorkStore.ClaimedWork claimOnly(String attemptId) {
         UUID commandId = (UUID) commandOf(attemptId).get("id");
-        return workStore.claim(50, Duration.ofSeconds(30)).stream()
-                .filter(work -> work.commandId().equals(commandId))
+        return workStore.claim(WorkKind.DISPATCH_START, 50, Duration.ofSeconds(30)).stream()
+                .filter(work -> work.subjectId().equals(commandId))
                 .findFirst()
                 .orElseThrow();
     }
