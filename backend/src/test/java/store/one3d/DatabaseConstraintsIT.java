@@ -8,6 +8,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.annotation.Transactional;
 import store.one3d.support.CatalogFixtures;
 import store.one3d.support.PostgresIntegrationTest;
+import store.one3d.support.TestUsers;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -96,10 +97,10 @@ class DatabaseConstraintsIT {
         // Since V3 a status past AWAITING_PAYMENT also needs confirmation
         // fields; they are set here so that only the status rule is broken.
         assertThatThrownBy(() -> jdbc.sql("""
-                        INSERT INTO customer_order (id, status, created_at, confirmed_at, confirmation_source)
-                        VALUES (?, 'SHIPPED', now(), now(), 'DEMO_SIMULATED')
+                        INSERT INTO customer_order (id, customer_id, status, created_at, confirmed_at, confirmation_source)
+                        VALUES (?, ?, 'SHIPPED', now(), now(), 'DEMO_SIMULATED')
                         """)
-                .params(UUID.randomUUID())
+                .params(UUID.randomUUID(), TestUsers.LEGACY_CUSTOMER_ID)
                 .update())
                 .isInstanceOf(DataIntegrityViolationException.class)
                 .hasMessageContaining("customer_order_status_known");
@@ -107,8 +108,8 @@ class DatabaseConstraintsIT {
 
     private UUID insertOrder(String status) {
         UUID orderId = UUID.randomUUID();
-        jdbc.sql("INSERT INTO customer_order (id, status, created_at) VALUES (?, ?, ?)")
-                .params(orderId, status, OffsetDateTime.now())
+        jdbc.sql("INSERT INTO customer_order (id, customer_id, status, created_at) VALUES (?, ?, ?, ?)")
+                .params(orderId, TestUsers.LEGACY_CUSTOMER_ID, status, OffsetDateTime.now())
                 .update();
         return orderId;
     }

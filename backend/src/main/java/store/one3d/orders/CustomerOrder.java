@@ -35,6 +35,10 @@ class CustomerOrder {
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;
 
+    // The signed-in customer who placed the order. Set from the session, never from request data.
+    @Column(name = "customer_id", updatable = false)
+    private UUID customerId;
+
     @Column(name = "confirmed_at")
     private Instant confirmedAt;
 
@@ -57,11 +61,12 @@ class CustomerOrder {
      * Creates a new order awaiting payment, copying the catalog values into
      * its line so later catalog changes cannot alter it.
      */
-    static CustomerOrder place(CatalogSnapshot item, int quantity, Instant createdAt) {
+    static CustomerOrder place(UUID customerId, CatalogSnapshot item, int quantity, Instant createdAt) {
         if (quantity != V1_QUANTITY) {
             throw new IllegalArgumentException("A V1 order has quantity " + V1_QUANTITY + ", not " + quantity);
         }
         CustomerOrder order = new CustomerOrder();
+        order.customerId = customerId;
         order.status = OrderStatus.AWAITING_PAYMENT;
         order.createdAt = createdAt;
         order.line = new OrderLine(order, item, quantity);
@@ -111,6 +116,10 @@ class CustomerOrder {
 
     Instant getCreatedAt() {
         return createdAt;
+    }
+
+    UUID getCustomerId() {
+        return customerId;
     }
 
     Instant getConfirmedAt() {

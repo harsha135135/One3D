@@ -7,6 +7,27 @@ spring:
     url: ${ONE3D_DB_URL:jdbc:postgresql://127.0.0.1:5433/one3d}
     username: ${ONE3D_DB_USERNAME:one3d}
     password: ${ONE3D_DB_PASSWORD:one3d-local-dev}
+  security:
+    oauth2:
+      client:
+        # One OIDC client called "oidc". Endpoints are explicit (no discovery
+        # call at startup); the defaults point at the local mock identity
+        # provider from compose.yaml. The aws profile points them at Cognito.
+        registration:
+          oidc:
+            client-id: ${ONE3D_OIDC_CLIENT_ID:one3d-local}
+            client-secret: ${ONE3D_OIDC_CLIENT_SECRET:local-dev-only}
+            authorization-grant-type: authorization_code
+            scope: openid,email,profile
+            redirect-uri: ${one3d.public-url}/login/oauth2/code/{registrationId}
+            client-name: One3D
+        provider:
+          oidc:
+            authorization-uri: ${ONE3D_OIDC_AUTHORIZATION_URI:${one3d.identity.issuer}/authorize}
+            token-uri: ${ONE3D_OIDC_TOKEN_URI:${one3d.identity.issuer}/token}
+            jwk-set-uri: ${ONE3D_OIDC_JWK_SET_URI:${one3d.identity.issuer}/jwks}
+            user-info-uri: ${ONE3D_OIDC_USER_INFO_URI:${one3d.identity.issuer}/userinfo}
+            user-name-attribute: sub
   jackson:
     deserialization:
       # Reject JSON numbers with a fraction or exponent (1.5, 1.0, 1e0) for
@@ -21,14 +42,29 @@ spring:
     open-in-view: false
 
 server:
-  # Checkpoint 1 has no authentication, so the API listens on the loopback
-  # interface only and cannot be reached from other machines. Change this
-  # deliberately when identity (Checkpoint 4) and the proxy (Checkpoint 7)
-  # exist.
+  # The API listens on the loopback interface only, so it is never reached
+  # without the HTTPS proxy (Checkpoint 7), even though sign-in exists since
+  # Checkpoint 4. Containers override this with SERVER_ADDRESS.
   address: 127.0.0.1
   port: 8080
+  servlet:
+    session:
+      cookie:
+        # The session cookie is never readable by JavaScript; it is Secure
+        # (HTTPS only) in the aws profile.
+        http-only: true
+        same-site: lax
 
 one3d:
+  # The address people open in the browser (frontend and API share it).
+  # Sign-in returns here, and the OIDC redirect URI is built from it.
+  public-url: ${ONE3D_PUBLIC_URL:http://localhost:3000}
+  identity:
+    # ID tokens must come from exactly this issuer.
+    issuer: ${ONE3D_OIDC_ISSUER:http://localhost:8180/default}
+    # Claim listing the user's groups: "groups" locally, "cognito:groups" on AWS.
+    groups-claim: ${ONE3D_OIDC_GROUPS_CLAIM:groups}
+    operator-group: operators
   simulator:
     # The separate printer simulator process (simulator/). Never public.
     base-url: ${ONE3D_SIMULATOR_URL:http://127.0.0.1:8090}

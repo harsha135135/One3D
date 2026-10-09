@@ -8,6 +8,7 @@ import java.util.UUID;
 /** API representation of an order. Built from the entity inside a transaction. */
 public record OrderResponse(
         UUID id,
+        UUID customerId,
         OrderStatus status,
         Instant createdAt,
         Instant confirmedAt,
@@ -31,6 +32,7 @@ public record OrderResponse(
         OrderLine line = order.getLine();
         return new OrderResponse(
                 order.getId(),
+                order.getCustomerId(),
                 order.getStatus(),
                 order.getCreatedAt(),
                 order.getConfirmedAt(),
