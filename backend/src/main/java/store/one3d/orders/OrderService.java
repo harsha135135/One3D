@@ -4,9 +4,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import store.one3d.catalog.CatalogService;
 import store.one3d.catalog.CatalogSnapshot;
+import store.one3d.common.Timestamps;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 /** Order use cases. Each public method is one database transaction. */
@@ -34,18 +33,44 @@ public class OrderService {
         CatalogSnapshot item = catalogService.findOrderable(configurationId)
                 .orElseThrow(() -> new ConfigurationNotOrderableException(configurationId));
 
-        // PostgreSQL stores microseconds; truncating keeps the returned value
-        // identical to what a later read returns.
-        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        CustomerOrder order = orders.save(CustomerOrder.place(item, quantity, Timestamps.now()));
+        return OrderResponse.from(order);
+    }
 
-        CustomerOrder order = orders.save(CustomerOrder.place(item, quantity, now));
+    /**
+     * Confirms an order as commercially eligible. In V1 the only caller is the
+     * demo-only {@link DemoPaymentController}; Checkpoint 6 adds verified
+     * test-mode payments. Confirmation never creates a job or starts a printer.
+     */
+    @Transactional
+    public OrderResponse confirm(UUID orderId, ConfirmationSource source) {
+        CustomerOrder order = findOrder(orderId);
+        order.confirm(source, Timestamps.now());
+        return OrderResponse.from(order);
+    }
+
+    /** For production release: the order must be CONFIRMED. */
+    @Transactional(readOnly = true)
+    public ReleasableOrder requireReleasable(UUID orderId) {
+        CustomerOrder order = findOrder(orderId);
+        order.requireConfirmed();
+        return new ReleasableOrder(order.getId(), order.getLine().getRecipeRevisionId());
+    }
+
+    /** Called by production only after the order's job has passed QC. */
+    @Transactional
+    public OrderResponse markReadyForHandoff(UUID orderId) {
+        CustomerOrder order = findOrder(orderId);
+        order.markReadyForHandoff(Timestamps.now());
         return OrderResponse.from(order);
     }
 
     @Transactional(readOnly = true)
     public OrderResponse getOrder(UUID orderId) {
-        return orders.findWithLine(orderId)
-                .map(OrderResponse::from)
-                .orElseThrow(() -> new OrderNotFoundException(orderId));
+        return OrderResponse.from(findOrder(orderId));
+    }
+
+    private CustomerOrder findOrder(UUID orderId) {
+        return orders.findWithLine(orderId).orElseThrow(() -> new OrderNotFoundException(orderId));
     }
 }

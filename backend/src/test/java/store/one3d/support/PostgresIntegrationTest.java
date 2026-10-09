@@ -3,6 +3,7 @@ package store.one3d.support;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -13,11 +14,14 @@ import java.lang.annotation.Target;
  * Full application context against real PostgreSQL. Every integration test
  * uses the same annotation, so Spring caches one context and one container
  * for the whole run instead of starting a new database per class.
+ * The "demo" profile enables the simulated-payment shortcut that the
+ * production tests use to confirm orders.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
+@ActiveProfiles("demo")
 public @interface PostgresIntegrationTest {
 }

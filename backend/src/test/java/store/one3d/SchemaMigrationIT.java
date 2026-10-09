@@ -29,7 +29,19 @@ class SchemaMigrationIT {
                 .query(String.class)
                 .list();
 
-        assertThat(applied).containsExactly("1", "2");
+        assertThat(applied).containsExactly("1", "2", "3", "4");
+    }
+
+    @Test
+    void seedAddsOneSimulatedPrinterWithAClearBed() {
+        String bedState = jdbc.sql("""
+                        SELECT bed_state FROM printer
+                        WHERE id = '0d3d0000-0000-4000-8000-000000000101' AND simulated
+                        """)
+                .query(String.class)
+                .single();
+
+        assertThat(bedState).isEqualTo("CLEAR");
     }
 
     @Test
