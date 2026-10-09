@@ -44,3 +44,59 @@ Content-Type: application/json
 
 ### Unknown order -> 404 ORDER_NOT_FOUND
 GET {{baseUrl}}/api/orders/00000000-0000-4000-8000-000000000000
+
+# ---------------------------------------------------------------------------
+# Checkpoint 2: production with the simulated printer.
+# Start the API with: ./mvnw spring-boot:run -Dspring-boot.run.profiles=demo
+# These mirror the curl steps in docs/evidence/2026-10-09-checkpoint-2.md;
+# paste the ids from each response into the variables below.
+# ---------------------------------------------------------------------------
+@printerId = 0d3d0000-0000-4000-8000-000000000101
+@jobId = 00000000-0000-4000-8000-000000000000
+@attemptId = 00000000-0000-4000-8000-000000000000
+
+### DEMO ONLY: confirm the order without payment (404 without the demo profile)
+POST {{baseUrl}}/api/demo/orders/{{orderId}}/simulate-payment
+
+### Release production for a confirmed order -> 201, job RELEASED
+POST {{baseUrl}}/api/ops/orders/{{orderId}}/release
+
+### Start the next attempt on the simulated printer -> 201, job PRINTING
+POST {{baseUrl}}/api/ops/jobs/{{jobId}}/attempts
+Content-Type: application/json
+
+{
+  "printerId": "{{printerId}}"
+}
+
+### Simulated printer reports a failure -> job RELEASED, attempt kept as FAILED
+POST {{baseUrl}}/api/ops/attempts/{{attemptId}}/simulate-failure
+Content-Type: application/json
+
+{
+  "reason": "First layer detached"
+}
+
+### Simulated printer reports completion -> job AWAITING_QC, bed still OCCUPIED
+POST {{baseUrl}}/api/ops/attempts/{{attemptId}}/simulate-completion
+
+### Whole-part QC -> PASSED accepts the job; FAILED needs a new attempt
+POST {{baseUrl}}/api/ops/attempts/{{attemptId}}/qc
+Content-Type: application/json
+
+{
+  "result": "PASSED",
+  "notes": "Whole part inspected"
+}
+
+### Operator clears the bed (needed before every new attempt)
+POST {{baseUrl}}/api/ops/printers/{{printerId}}/clear-bed
+
+### Mark the order ready for handoff -> 409 JOB_NOT_ACCEPTED until QC passed
+POST {{baseUrl}}/api/ops/orders/{{orderId}}/ready-for-handoff
+
+### Job with all attempts
+GET {{baseUrl}}/api/ops/jobs/{{jobId}}
+
+### Printers: ownership and bed state
+GET {{baseUrl}}/api/ops/printers

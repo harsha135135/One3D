@@ -10,6 +10,9 @@ public record OrderResponse(
         UUID id,
         OrderStatus status,
         Instant createdAt,
+        Instant confirmedAt,
+        ConfirmationSource confirmationSource,
+        Instant readyForHandoffAt,
         Line line,
         Money total) {
 
@@ -30,6 +33,9 @@ public record OrderResponse(
                 order.getId(),
                 order.getStatus(),
                 order.getCreatedAt(),
+                order.getConfirmedAt(),
+                order.getConfirmationSource(),
+                order.getReadyForHandoffAt(),
                 new Line(
                         line.getProductConfigurationId(),
                         line.getProductName(),

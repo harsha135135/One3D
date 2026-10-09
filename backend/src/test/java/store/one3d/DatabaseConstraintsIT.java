@@ -93,7 +93,14 @@ class DatabaseConstraintsIT {
 
     @Test
     void orderStatusMustBeKnown() {
-        assertThatThrownBy(() -> insertOrder("SHIPPED"))
+        // Since V3 a status past AWAITING_PAYMENT also needs confirmation
+        // fields; they are set here so that only the status rule is broken.
+        assertThatThrownBy(() -> jdbc.sql("""
+                        INSERT INTO customer_order (id, status, created_at, confirmed_at, confirmation_source)
+                        VALUES (?, 'SHIPPED', now(), now(), 'DEMO_SIMULATED')
+                        """)
+                .params(UUID.randomUUID())
+                .update())
                 .isInstanceOf(DataIntegrityViolationException.class)
                 .hasMessageContaining("customer_order_status_known");
     }

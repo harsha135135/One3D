@@ -22,3 +22,10 @@ server:
   # exist.
   address: 127.0.0.1
   port: 8080
+
+one3d:
+  demo:
+    # Demo-only shortcut that confirms an order without payment
+    # (POST /api/demo/orders/{id}/simulate-payment). Off by default; the "demo"
+    # profile turns it on. Checkpoint 6 replaces it with test-mode payments.
+    simulated-payment-enabled: false

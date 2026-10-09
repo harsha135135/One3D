@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import store.one3d.catalog.CatalogSnapshot;
+import store.one3d.common.ConflictException;
 import store.one3d.common.Money;
 
 import java.time.Instant;
@@ -33,6 +34,16 @@ class CustomerOrder {
 
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;
+
+    @Column(name = "confirmed_at")
+    private Instant confirmedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "confirmation_source")
+    private ConfirmationSource confirmationSource;
+
+    @Column(name = "ready_for_handoff_at")
+    private Instant readyForHandoffAt;
 
     // Saving the order also inserts its line (cascade), in the same transaction.
     @OneToOne(mappedBy = "order", cascade = CascadeType.PERSIST, optional = false)
@@ -57,6 +68,34 @@ class CustomerOrder {
         return order;
     }
 
+    /**
+     * Marks the order as commercially eligible for production. This does not
+     * release or start anything: an operator releases production separately.
+     */
+    void confirm(ConfirmationSource source, Instant now) {
+        if (status != OrderStatus.AWAITING_PAYMENT) {
+            throw new ConflictException("ORDER_NOT_AWAITING_PAYMENT",
+                    "Order " + id + " is " + status + ", not AWAITING_PAYMENT.");
+        }
+        status = OrderStatus.CONFIRMED;
+        confirmedAt = now;
+        confirmationSource = source;
+    }
+
+    /** Production checks that the job was accepted before calling this. */
+    void markReadyForHandoff(Instant now) {
+        requireConfirmed();
+        status = OrderStatus.READY_FOR_HANDOFF;
+        readyForHandoffAt = now;
+    }
+
+    void requireConfirmed() {
+        if (status != OrderStatus.CONFIRMED) {
+            throw new ConflictException("ORDER_NOT_CONFIRMED",
+                    "Order " + id + " is " + status + ", not CONFIRMED.");
+        }
+    }
+
     /** Price of the single line times its quantity. */
     Money total() {
         return new Money(line.getUnitPriceMinor() * line.getQuantity(), line.getCurrency());
@@ -72,6 +111,18 @@ class CustomerOrder {
 
     Instant getCreatedAt() {
         return createdAt;
+    }
+
+    Instant getConfirmedAt() {
+        return confirmedAt;
+    }
+
+    ConfirmationSource getConfirmationSource() {
+        return confirmationSource;
+    }
+
+    Instant getReadyForHandoffAt() {
+        return readyForHandoffAt;
     }
 
     OrderLine getLine() {

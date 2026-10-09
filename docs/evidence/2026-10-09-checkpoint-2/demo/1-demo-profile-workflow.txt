@@ -1,0 +1,65 @@
+$ curl -X POST http://127.0.0.1:8080/api/orders -d '{"productConfigurationId":"0d3d0000-0000-4000-8000-000000000002","quantity":1}'
+HTTP 201
+{"id":"eaac7a42-4658-462e-9c4a-480a8b60e9fc","status":"AWAITING_PAYMENT","confirmationSource":null}
+
+$ curl -X POST http://127.0.0.1:8080/api/demo/orders/eaac7a42-4658-462e-9c4a-480a8b60e9fc/simulate-payment
+HTTP 200
+{"status":"CONFIRMED","confirmedAt":"2026-10-09T07:49:13.269439Z","confirmationSource":"DEMO_SIMULATED"}
+
+$ curl -X GET http://127.0.0.1:8080/api/ops/printers
+HTTP 200
+[{"name":"SIM-X1C-01 (simulated)","simulated":true,"bedState":"CLEAR","currentAttemptId":null}]
+
+$ curl -X POST http://127.0.0.1:8080/api/ops/orders/eaac7a42-4658-462e-9c4a-480a8b60e9fc/release
+HTTP 201
+{"id":"84776cc9-7007-4a03-be3d-f4ddfd17097e","status":"RELEASED","recipeRevisionId":"0d3d0000-0000-4000-8000-000000000003","attempts":[]}
+
+$ curl -X POST http://127.0.0.1:8080/api/ops/jobs/84776cc9-7007-4a03-be3d-f4ddfd17097e/attempts -d '{"printerId":"0d3d0000-0000-4000-8000-000000000101"}'
+HTTP 201
+{"status":"PRINTING","attempts":[{"attemptNumber":1,"status":"RUNNING","failureReason":null,"qcResult":null}]}
+
+$ curl -X POST http://127.0.0.1:8080/api/ops/attempts/3f52e600-4190-4e04-b9c1-2308fc9248a9/simulate-failure -d '{"reason":"First layer detached"}'
+HTTP 200
+{"status":"RELEASED","attempts":[{"attemptNumber":1,"status":"FAILED","failureReason":"First layer detached","qcResult":null}]}
+
+$ curl -X GET http://127.0.0.1:8080/api/ops/printers
+HTTP 200
+{"bedState":"OCCUPIED","currentAttemptId":null}
+
+$ curl -X POST http://127.0.0.1:8080/api/ops/jobs/84776cc9-7007-4a03-be3d-f4ddfd17097e/attempts -d '{"printerId":"0d3d0000-0000-4000-8000-000000000101"}'
+HTTP 409
+{"code":"BED_NOT_CLEAR","detail":"Printer SIM-X1C-01 (simulated) has not been cleared since its last print."}
+
+$ curl -X POST http://127.0.0.1:8080/api/ops/printers/0d3d0000-0000-4000-8000-000000000101/clear-bed
+HTTP 200
+{"bedState":"CLEAR","currentAttemptId":null}
+
+$ curl -X POST http://127.0.0.1:8080/api/ops/jobs/84776cc9-7007-4a03-be3d-f4ddfd17097e/attempts -d '{"printerId":"0d3d0000-0000-4000-8000-000000000101"}'
+HTTP 201
+{"status":"PRINTING","attempts":[{"attemptNumber":1,"status":"FAILED","failureReason":"First layer detached","qcResult":null},{"attemptNumber":2,"status":"RUNNING","failureReason":null,"qcResult":null}]}
+
+$ curl -X POST http://127.0.0.1:8080/api/ops/attempts/33a817e0-2075-4c0b-b9e5-a11db8d1630e/simulate-completion
+HTTP 200
+{"status":"AWAITING_QC","attempts":[{"attemptNumber":1,"status":"FAILED","failureReason":"First layer detached","qcResult":null},{"attemptNumber":2,"status":"COMPLETED","failureReason":null,"qcResult":null}]}
+
+$ curl -X GET http://127.0.0.1:8080/api/ops/printers
+HTTP 200
+{"bedState":"OCCUPIED","currentAttemptId":null}
+
+$ curl -X POST http://127.0.0.1:8080/api/ops/orders/eaac7a42-4658-462e-9c4a-480a8b60e9fc/ready-for-handoff
+HTTP 409
+{"code":"JOB_NOT_ACCEPTED","detail":"Job 84776cc9-7007-4a03-be3d-f4ddfd17097e is AWAITING_QC, not ACCEPTED."}
+
+$ curl -X POST http://127.0.0.1:8080/api/ops/attempts/33a817e0-2075-4c0b-b9e5-a11db8d1630e/qc -d '{"result":"PASSED","notes":"Whole part inspected"}'
+HTTP 200
+{"status":"ACCEPTED","attempts":[{"attemptNumber":1,"status":"FAILED","failureReason":"First layer detached","qcResult":null},{"attemptNumber":2,"status":"COMPLETED","failureReason":null,"qcResult":"PASSED"}]}
+
+$ curl -X POST http://127.0.0.1:8080/api/ops/orders/eaac7a42-4658-462e-9c4a-480a8b60e9fc/ready-for-handoff
+HTTP 200
+{"status":"READY_FOR_HANDOFF","readyForHandoffAt":"2026-10-09T07:49:13.766910Z"}
+
+$ curl -X POST http://127.0.0.1:8080/api/ops/printers/0d3d0000-0000-4000-8000-000000000101/clear-bed
+HTTP 200
+{"bedState":"CLEAR","currentAttemptId":null}
+
+ORDER=eaac7a42-4658-462e-9c4a-480a8b60e9fc JOB=84776cc9-7007-4a03-be3d-f4ddfd17097e
