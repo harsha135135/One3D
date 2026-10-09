@@ -1,5 +1,6 @@
-# Local development database for Checkpoint 1. The application itself runs
-# on the host (see README). Checkpoint 7 adds the application to this file.
+# Local development services: PostgreSQL and the printer simulator. The
+# backend itself runs on the host (see README). Checkpoint 7 adds the
+# application containers and a deployment variant.
 services:
   db:
     image: postgres:17-alpine
@@ -21,5 +22,19 @@ services:
       timeout: 3s
       retries: 10
 
+  # The separate printer simulator (simulator/). Its journal survives restarts
+  # in the one3d-simulator volume. Dev controls (complete/fail/drop replies)
+  # are for local development only, and the port is published on 127.0.0.1.
+  simulator:
+    build: ./simulator
+    image: one3d-simulator:local
+    environment:
+      SIMULATOR_DEV_CONTROLS: "true"
+    ports:
+      - "127.0.0.1:8090:8090"
+    volumes:
+      - one3d-simulator:/data
+
 volumes:
   one3d-db:
+  one3d-simulator:
