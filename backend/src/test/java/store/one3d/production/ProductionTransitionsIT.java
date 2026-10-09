@@ -208,7 +208,8 @@ class ProductionTransitionsIT {
                         {"result": "MAYBE"}
                         """)
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("result"));
     }
 
     private static void expectConflict(ResultActions response, String code) throws Exception {

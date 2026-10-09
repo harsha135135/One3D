@@ -7,6 +7,11 @@ spring:
     url: ${ONE3D_DB_URL:jdbc:postgresql://127.0.0.1:5433/one3d}
     username: ${ONE3D_DB_USERNAME:one3d}
     password: ${ONE3D_DB_PASSWORD:one3d-local-dev}
+  jackson:
+    deserialization:
+      # Reject JSON numbers with a fraction or exponent (1.5, 1.0, 1e0) for
+      # integer fields instead of silently truncating them to 1.
+      accept-float-as-int: false
   jpa:
     # Flyway owns the schema; Hibernate only checks that entities match it.
     hibernate:

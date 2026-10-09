@@ -14,8 +14,12 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.exc.MismatchedInputException;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Converts exceptions into RFC 9457 problem responses
@@ -54,8 +58,29 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @Override
     protected ResponseEntity<Object> handleHttpMessageNotReadable(
             HttpMessageNotReadableException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-        ProblemDetail body = problem(status, "MALFORMED_REQUEST", "The request body is missing or is not valid JSON.");
+        ProblemDetail body = invalidFieldValue(ex).orElseGet(() ->
+                problem(status, "MALFORMED_REQUEST", "The request body is missing or is not valid JSON."));
         return handleExceptionInternal(ex, body, headers, status, request);
+    }
+
+    /**
+     * Well-formed JSON with a value of the wrong type for a field, such as 1.5
+     * for an integer or an unknown enum name, reported as a field error.
+     */
+    private static Optional<ProblemDetail> invalidFieldValue(HttpMessageNotReadableException ex) {
+        if (!(ex.getCause() instanceof MismatchedInputException mismatch) || mismatch.getPath().isEmpty()) {
+            return Optional.empty();
+        }
+        String field = mismatch.getPath().stream()
+                .map(ApiExceptionHandler::pathSegment)
+                .collect(Collectors.joining("."));
+        ProblemDetail body = problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "One or more fields are invalid.");
+        body.setProperty("errors", List.of(new FieldViolation(field, "has a value of the wrong type")));
+        return Optional.of(body);
+    }
+
+    private static String pathSegment(JacksonException.Reference reference) {
+        return reference.getPropertyName() != null ? reference.getPropertyName() : "[" + reference.getIndex() + "]";
     }
 
     @Override
