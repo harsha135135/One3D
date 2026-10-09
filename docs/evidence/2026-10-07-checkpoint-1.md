@@ -13,6 +13,7 @@ Environment:         macOS 26.5.2 (arm64); OpenJDK 21.0.12.1 (Homebrew); Maven 3
 What is simulated:   Synthetic catalog data only. No payment, printer, customer
                      identity or authentication exists at this checkpoint.
 Owner explanation/change/debug review: PENDING (see the end of this record)
+                     Update 2026-10-09: signed off by Harsha; see the addendum at the end
 Related IMPLEMENTED.md rows: Java modules/schema; catalog product; integration tests;
                      runnable setup/API documentation (all partial)
 ```
@@ -145,6 +146,8 @@ The schema allows at most one line per order (`UNIQUE (order_id)`), but nothing 
 
 ## Owner review (pending)
 
+> **Update 2026-10-09:** Harsha signed off Checkpoint 1. The outcome is in the [addendum](#owner-review-addendum-2026-10-09) below. The requirements here are kept as written on 2026-10-07.
+
 Harsha hasn't done the explanation/change/debug review yet. Running these checks doesn't establish personal understanding. To complete it:
 
 1. **Explain:** trace `POST /api/orders` from HTTP → `OrderController` → `OrderService.placeOrder` → `CatalogService.findOrderable` → the SQL that Hibernate issues at commit. Say where the transaction starts and ends, and why the line copies values instead of joining to the catalog on read.
@@ -155,3 +158,61 @@ Harsha hasn't done the explanation/change/debug review yet. Running these checks
    - what would break if the order read its price from `product_configuration` instead.
 
 Record the date and outcome here and in `IMPLEMENTED.md` only after Harsha has completed them himself.
+
+## Owner review addendum: 2026-10-09
+
+Code revision: `482dbd690817f4d19787a40bc4545b5c201280cc` ("Default a missing order quantity to 1"), on top of `c60ccbe`.
+
+### Behaviour change
+
+A missing or explicitly null `quantity` now defaults to 1 and the order is created (201). Quantities 0 and 2 still return 400 `VALIDATION_FAILED` and store nothing. This supersedes the 2026-10-07 result "missing quantity → 400" in section 1, which remains the record for `0fb442e`.
+
+| Change | Made by |
+|---|---|
+| Removed `@NotNull` from `quantity`; compact constructor defaults null to 1; `@Min`/`@Max` kept; tests for missing quantity, 0 and 2 | Harsha |
+| Constructor indentation, Javadoc, `explicitNullQuantityDefaultsToOne` test | Assistant, at Harsha's request |
+
+### Verification
+
+| Time (IST) | Code | Command | Result |
+|---|---|---|---|
+| 12:49 | Harsha's version (`c60ccbe` + working tree) | `./mvnw verify` | 28 passed (3 unit, 25 integration); Harsha's own run reported the same |
+| 12:53 | Final working tree | `./mvnw verify` | 29 passed (3 unit, 26 integration) |
+| 13:02:38 | Commit `482dbd6`, clean tree | `./mvnw clean verify` | **29 passed** (3 unit, 26 integration: `DatabaseConstraintsIT` 7, `CatalogApiIT` 2, `SchemaMigrationIT` 2, `OrderApiIT` 11, `OrderSnapshotIT` 2, `OrderAtomicityIT` 2); 0 failures, errors or skips; `BUILD SUCCESS` in 8.556 s |
+
+Environment for the last run: JDK 21.0.12.1, Testcontainers 2.0.5, PostgreSQL 17.11. Its reports are in [`2026-10-07-checkpoint-1/test-reports-2026-10-09/`](2026-10-07-checkpoint-1/test-reports-2026-10-09/). `OrderAtomicityIT` logs `ERROR: injected order_line failure` on purpose; that is the fault it injects, not a failure.
+
+### Runtime trace (independent, 12:59 IST)
+
+Harsha ran `./mvnw spring-boot:run -Dspring-boot.run.arguments=--logging.level.org.hibernate.SQL=debug` and placed one order. It returned 201 with id `ac53b899-f28a-4847-a059-e1f1983bba74`. His terminal logged these statements, in order:
+
+```sql
+select pc1_0.id,pc1_0.code,pc1_0.currency,crr1_0.id,crr1_0.revision_number,pc1_0.description,pc1_0.price_minor,pc1_0.product_id,p1_0.id,p1_0.name
+from product_configuration pc1_0
+join product p1_0 on p1_0.id=pc1_0.product_id
+join recipe_revision crr1_0 on crr1_0.id=pc1_0.current_recipe_revision_id
+where pc1_0.id=?
+
+insert into customer_order (created_at,status,id) values (?,?,?)
+
+insert into order_line (configuration_code,configuration_description,currency,order_id,product_configuration_id,product_name,quantity,recipe_revision_id,recipe_revision_number,unit_price_minor,id) values (?,?,?,?,?,?,?,?,?,?,?)
+```
+
+The assistant confirmed that this order and its single line exist in the local database, created 2026-10-09 12:59:03 IST (quantity 1, 49900 INR, recipe revision 1).
+
+Harsha's explanation: `@Transactional` on `OrderService.placeOrder()` controls the transaction. Spring commits after the method completes successfully. If the order-line insert fails, the transaction rolls back, so the order header isn't committed by itself. Hibernate's SQL log does not print `COMMIT`, because Spring issues it.
+
+### Explanation history
+
+- **Round 1.** Five questions: SQL order and commit, removing only `@NotNull`, `NOT NULL` alongside `CHECK`, the composite foreign key, and snapshots. They were answered with reference explanations given to Harsha. The content is correct, but it is not an independent explanation.
+- **Round 2.** The Flyway checksum answer and the "which change breaks the default" answer were correct and are recorded as reference-assisted. The runtime-SQL question was first answered with a predicted sequence, then completed independently (above).
+
+### Outcome
+
+| Requirement | Result |
+|---|---|
+| Change an existing validation rule and its test | Complete (Harsha; follow-up edits by the assistant as listed above) |
+| Trace the request and explain the transaction boundary | Complete, independent (runtime trace) |
+| Explain the schema and snapshot | **Reference-assisted.** Harsha will revisit the schema constraints without help before making any related résumé claim, and again at the final V1 review. |
+
+**Owner sign-off: given by Harsha on 2026-10-09**, with the schema and snapshot explanation recorded as reference-assisted. This completes Checkpoint 1. It does not complete V1, and Checkpoint 2 has not started.

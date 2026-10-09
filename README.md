@@ -2,9 +2,9 @@
 
 **V1: a focused Java backend portfolio project, built to demonstrate fresher-level engineering skills.**
 
-One3D is the planned custom-manufacturing business of [OneCreations](https://github.com/harsha135135/OneCreations). Its operating software is called **PrintFlow**. Checkpoint 1 of V1 (a catalog order API on Spring Boot and PostgreSQL) is implemented and tested locally. Later checkpoints, infrastructure and deployment are not implemented yet.
+One3D is the planned custom-manufacturing business of [OneCreations](https://github.com/harsha135135/OneCreations). Its operating software is called **PrintFlow**. Checkpoint 1 of V1 (a catalog order API on Spring Boot and PostgreSQL) is implemented, tested locally and signed off by the owner. Later checkpoints, infrastructure and deployment are not implemented yet, and V1 is not complete.
 
-Status: Checkpoint 1 implemented and tested locally; owner review pending · Scope updated: 2026-10-07
+Status: Checkpoint 1 complete (signed off 2026-10-09; schema explanation reference-assisted, to revisit) · Scope updated: 2026-10-07
 
 ## What we are building first
 
@@ -67,7 +67,7 @@ The integration tests start their own disposable PostgreSQL container, so step 2
 | Method and path | Purpose |
 |---|---|
 | `GET /api/catalog/configurations` | List orderable configurations (one seeded demo item) |
-| `POST /api/orders` | Place a one-line order: `{"productConfigurationId": "…", "quantity": 1}` returns 201 and a `Location` header |
+| `POST /api/orders` | Place a one-line order: `{"productConfigurationId": "…", "quantity": 1}` returns 201 and a `Location` header. `quantity` may be omitted or null (it defaults to 1); any other value returns 400 |
 | `GET /api/orders/{id}` | Read an order and its catalog snapshot |
 
 ```bash
