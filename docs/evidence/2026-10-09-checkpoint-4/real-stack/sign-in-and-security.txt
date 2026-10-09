@@ -1,0 +1,29 @@
+
+## 1. Sign in as two customers and an operator (mock identity provider)
+sign-in as customer-a: callback HTTP 302, redirected to http://localhost:3000/
+sign-in as customer-b: callback HTTP 302, redirected to http://localhost:3000/
+sign-in as operator-1: callback HTTP 302, redirected to http://localhost:3000/
+session cookies (HttpOnly) for A: D48DF98C…; XSRF-TOKEN present for A: yes
+A /api/me: {"email":"customer-a@example.test","roles":["CUSTOMER"]}
+O /api/me: {"email":"operator-1@example.test","roles":["CUSTOMER","OPERATOR"]}
+
+## 2. A places an order: with the CSRF header, then without it
+with header: {"status":"AWAITING_PAYMENT","total":{"amountMinor":49900,"currency":"INR"}}
+without header: CSRF_TOKEN_INVALID HTTP 403
+
+## 3. Ownership: A reads the order; B cannot read it or pay for it
+A GET order: HTTP 200
+B GET order: ORDER_NOT_FOUND HTTP 404
+B pays A's order: ORDER_NOT_FOUND HTTP 404
+B's own list contains A's order: false
+
+## 4. Roles: a customer is refused operator routes; the operator sees the confirmed order
+B GET /api/ops/orders: ACCESS_DENIED HTTP 403
+A pays (demo): {"status":"CONFIRMED","confirmationSource":"DEMO_SIMULATED"}
+O queue has A's order: true
+
+## 5. Sign out A; the same session cookie no longer works
+A before sign-out (old session D48DF98C…): HTTP 200
+A POST /logout: HTTP 204
+the same old session cookie D48DF98C… after sign-out: UNAUTHENTICATED HTTP 401
+anonymous GET /api/orders: UNAUTHENTICATED HTTP 401

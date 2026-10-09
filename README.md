@@ -2,9 +2,9 @@
 
 **V1: a focused Java backend portfolio project, built to demonstrate fresher-level engineering skills.**
 
-One3D is the planned custom-manufacturing business of [OneCreations](https://github.com/harsha135135/OneCreations). Its operating software is called **PrintFlow**. Checkpoint 1 of V1 (a catalog order API on Spring Boot and PostgreSQL) is implemented, tested locally and signed off by the owner. Checkpoint 2 (release, jobs, attempts, bed clearance and QC) and Checkpoint 3 (a separate durable printer simulator, dispatch and reconciliation, protection against concurrent operators) are implemented and tested; their owner reviews are deferred until V1 is complete. Later checkpoints, infrastructure and deployment are not implemented yet, and V1 is not complete.
+One3D is the planned custom-manufacturing business of [OneCreations](https://github.com/harsha135135/OneCreations). Its operating software is called **PrintFlow**. Checkpoint 1 of V1 (a catalog order API on Spring Boot and PostgreSQL) is implemented, tested locally and signed off by the owner. Checkpoint 2 (release, jobs, attempts, bed clearance and QC) Checkpoint 3 (a separate durable printer simulator, dispatch and reconciliation, protection against concurrent operators) and Checkpoint 4 (sign-in, roles, order ownership and the customer and operator frontend) are implemented and tested; their owner reviews are deferred until V1 is complete. Later checkpoints, infrastructure and deployment are not implemented yet, and V1 is not complete.
 
-Status: Checkpoint 1 complete (signed off 2026-10-09; schema explanation reference-assisted, to revisit); Checkpoints 2–3 implemented and tested, owner reviews deferred until V1 is complete · Scope updated: 2026-10-07
+Status: Checkpoint 1 complete (signed off 2026-10-09; schema explanation reference-assisted, to revisit); Checkpoints 2–4 implemented and tested, owner reviews deferred until V1 is complete · Scope updated: 2026-10-07
 
 ## What we are building first
 
@@ -45,41 +45,50 @@ These are planned choices, not claims of hands-on experience. The [scope](docs/v
 
 ## Run it locally
 
-These commands were run on 2026-10-07 and 2026-10-09; results are in the [Checkpoint 1](docs/evidence/2026-10-07-checkpoint-1.md), [Checkpoint 2](docs/evidence/2026-10-09-checkpoint-2.md) and [Checkpoint 3](docs/evidence/2026-10-09-checkpoint-3.md) evidence.
+These commands were run on 2026-10-07 and 2026-10-09; results are in the [Checkpoint 1](docs/evidence/2026-10-07-checkpoint-1.md), [2](docs/evidence/2026-10-09-checkpoint-2.md), [3](docs/evidence/2026-10-09-checkpoint-3.md) and [4](docs/evidence/2026-10-09-checkpoint-4.md) evidence.
 
-**Prerequisites:** JDK 21 (checked with 21.0.12; point `JAVA_HOME` at it if your default JDK differs) and a running Docker daemon. Maven is not required: use the included `./mvnw` wrapper.
+**Prerequisites:** JDK 21 (checked with 21.0.12; point `JAVA_HOME` at it if your default JDK differs), Node 24 LTS for the frontend (`frontend/.nvmrc`) and a running Docker daemon. Maven is not required: use the included `./mvnw` wrapper.
 
 ```bash
-# 1. Start PostgreSQL (127.0.0.1:5433) and the printer simulator (127.0.0.1:8090)
-docker compose up -d --build db simulator
+# 1. Start PostgreSQL (127.0.0.1:5433), the printer simulator (127.0.0.1:8090)
+#    and the local mock identity provider (localhost:8180)
+docker compose up -d --build db simulator idp
 
 # 2. Run each test suite from its own directory
 (cd simulator && ./mvnw verify)   # simulator unit and HTTP tests
 (cd backend && ./mvnw verify)     # backend unit tests (Surefire) and integration tests
                                   # (*IT, Failsafe; PostgreSQL and the simulator run as containers)
+(cd frontend && npm ci && npm run lint && npm run build && npm run typecheck \
+   && npx playwright install chromium && npm run test:e2e)   # browser smoke tests, API mocked
 
-# 3. Start the API on http://127.0.0.1:8080 (Ctrl+C to stop)
-cd backend
-./mvnw spring-boot:run
+# 3. Start the API on http://127.0.0.1:8080 with the demo-only simulated
+#    payment (needed to walk an order through production before Checkpoint 6)
+(cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=demo)
 
-# 3b. Or start it with the demo-only simulated payment, needed to
-#     walk an order through production before real payments exist
-./mvnw spring-boot:run -Dspring-boot.run.profiles=demo
+# 4. In another terminal, start the frontend and open http://localhost:3000
+(cd frontend && npm ci && npm run dev)
 ```
 
-The integration tests start their own PostgreSQL and simulator containers (the simulator image is built from `simulator/Dockerfile` on first use), so step 2 does not need step 1. A background worker in the backend delivers start commands to the simulator and polls running prints once per second. Stop the local services with `docker compose stop`; their data stays in the `one3d-db` and `one3d-simulator` volumes. The same suites run in GitHub Actions on every pull request.
+Sign in with **any username** on the mock provider's form. Usernames starting with `operator` (for example `operator-1`) get the operator role and the Operations pages; any other name is a customer. The frontend forwards `/api`, `/oauth2`, `/login` and `/logout` to the backend, so the session and CSRF cookies stay on one origin.
+
+Every `/api` call except the catalog needs a signed-in session, and state-changing calls also need the `X-XSRF-TOKEN` header (the frontend handles both). Customers see only their own orders; `/api/ops/**` is for operators. The integration tests start their own PostgreSQL and simulator containers (the simulator image is built from `simulator/Dockerfile` on first use), so step 2 does not need step 1. A background worker in the backend delivers start commands to the simulator and polls running prints once per second. Stop the local services with `docker compose stop`; their data stays in the `one3d-db` and `one3d-simulator` volumes. The same suites run in GitHub Actions on every pull request.
 
 | Method and path | Purpose |
 |---|---|
 | `GET /api/catalog/configurations` | List orderable configurations (one seeded demo item) |
 | `POST /api/orders` | Place a one-line order: `{"productConfigurationId": "…", "quantity": 1}` returns 201 and a `Location` header. `quantity` may be omitted or null (it defaults to 1); any other value, including a fractional number such as `1.5`, returns 400 |
-| `GET /api/orders/{id}` | Read an order and its catalog snapshot |
+| `GET /api/orders/{id}` | Read one of your own orders; another customer's order is 404 |
+| `GET /api/orders?page=0&size=20` | Your orders, newest first (size at most 50) |
+| `GET /api/me` | Who is signed in, their roles, and whether the demo payment is enabled |
+| `POST /logout` | Sign out (204); the session ends on the server |
 
-Operator production endpoints (Checkpoints 2–3). `/api/ops` is a grouping, not access control:
+Operator endpoints (Checkpoints 2–4), operators only:
 
 | Method and path | Purpose |
 |---|---|
-| `POST /api/demo/orders/{id}/simulate-payment` | **Demo profile only.** Confirm an order without payment; the order records `confirmationSource: DEMO_SIMULATED` |
+| `GET /api/ops/orders?status=CONFIRMED` | Operator queue: orders by state, oldest first, each with its job |
+| `GET /api/ops/orders/{id}` | Any order, with its job |
+| `POST /api/demo/orders/{id}/simulate-payment` | **Demo profile only; customers, own order only.** Confirm an order without payment; the order records `confirmationSource: DEMO_SIMULATED` |
 | `POST /api/ops/orders/{id}/release` | Create the order's production job (order must be `CONFIRMED`) |
 | `POST /api/ops/jobs/{id}/attempts` | Record the start of the next attempt: `{"printerId": "…"}`. The attempt is `START_INTENT` until the worker has delivered it and the simulator confirms (`RUNNING`). A lost reply makes it `RECONCILIATION_REQUIRED`; it keeps the printer until the simulator's journal answers. Needs a free printer with a cleared bed. At most 3 attempts per job, counting print failures and QC failures; starts the printer refused do not count; a 4th returns 409 `ATTEMPT_LIMIT_REACHED` |
 | `POST /api/ops/attempts/{id}/qc` | Whole-part inspection: `{"result": "PASSED" or "FAILED", "notes": "…"}` |
@@ -99,7 +108,7 @@ curl -s -X POST http://127.0.0.1:8080/api/orders \
 
 More requests, including invalid ones, are in [`backend/api.http`](backend/api.http). Errors are `application/problem+json` responses with a stable `code` (for example `VALIDATION_FAILED`, `CONFIGURATION_NOT_ORDERABLE` or `ORDER_NOT_FOUND`).
 
-There is **no authentication** before Checkpoint 4. For that reason the API listens on 127.0.0.1 and the database port is published on localhost only. Do not expose either until identity (Checkpoint 4) and the proxy (Checkpoint 7) exist.
+Locally, every service listens on 127.0.0.1 (the identity provider on localhost) and is never published to other machines. The HTTPS proxy and the public demo come in Checkpoint 7, where Cognito replaces the mock identity provider.
 
 ## V1 completion and the next step
 

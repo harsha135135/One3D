@@ -1,0 +1,94 @@
+// Response shapes of the backend API (see backend/src/main/java/.../*Response.java).
+
+export type Money = { amountMinor: number; currency: string };
+
+export type Me = { id: string; email: string | null; roles: string[]; demoPaymentEnabled: boolean };
+
+export type CatalogItem = {
+  configurationId: string;
+  productName: string;
+  configurationCode: string;
+  description: string;
+  price: Money;
+  recipeRevisionNumber: number;
+};
+
+export type OrderStatus = "AWAITING_PAYMENT" | "CONFIRMED" | "READY_FOR_HANDOFF";
+
+export type Order = {
+  id: string;
+  customerId: string;
+  status: OrderStatus;
+  createdAt: string;
+  confirmedAt: string | null;
+  confirmationSource: string | null;
+  readyForHandoffAt: string | null;
+  line: {
+    productConfigurationId: string;
+    productName: string;
+    configurationCode: string;
+    configurationDescription: string;
+    recipeRevisionId: string;
+    recipeRevisionNumber: number;
+    quantity: number;
+    unitPrice: Money;
+  };
+  total: Money;
+};
+
+export type Page<T> = { items: T[]; page: number; size: number; totalItems: number; totalPages: number };
+
+export type JobStatus = "RELEASED" | "PRINTING" | "AWAITING_QC" | "ACCEPTED";
+
+export type AttemptStatus =
+  | "START_INTENT"
+  | "RUNNING"
+  | "COMPLETED"
+  | "FAILED"
+  | "REJECTED_BEFORE_START"
+  | "RECONCILIATION_REQUIRED";
+
+export type Attempt = {
+  id: string;
+  attemptNumber: number;
+  printerId: string;
+  status: AttemptStatus;
+  startedAt: string;
+  endedAt: string | null;
+  failureReason: string | null;
+  qcResult: "PASSED" | "FAILED" | null;
+  qcNotes: string | null;
+  qcRecordedAt: string | null;
+};
+
+export type Job = {
+  id: string;
+  orderId: string;
+  recipeRevisionId: string;
+  status: JobStatus;
+  releasedAt: string;
+  acceptedAt: string | null;
+  attempts: Attempt[];
+};
+
+export type QueueItem = { order: Order; jobId: string | null; jobStatus: JobStatus | null };
+
+export type Printer = {
+  id: string;
+  name: string;
+  simulated: boolean;
+  bedState: "CLEAR" | "OCCUPIED";
+  bedCycleAttemptId: string | null;
+  currentAttemptId: string | null;
+  bedStateChangedAt: string;
+};
+
+export type Work = {
+  id: string;
+  kind: string;
+  commandId: string;
+  status: string;
+  attempts: number;
+  maxAttempts: number;
+  lastError: string | null;
+};

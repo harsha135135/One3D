@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import store.one3d.identity.CurrentUser;
 
 import java.util.UUID;
 
@@ -21,13 +22,16 @@ import java.util.UUID;
 class DemoPaymentController {
 
     private final OrderService orderService;
+    private final CurrentUser currentUser;
 
-    DemoPaymentController(OrderService orderService) {
+    DemoPaymentController(OrderService orderService, CurrentUser currentUser) {
         this.orderService = orderService;
+        this.currentUser = currentUser;
     }
 
+    /** Only for the caller's own order. */
     @PostMapping("/{orderId}/simulate-payment")
     OrderResponse simulatePayment(@PathVariable UUID orderId) {
-        return orderService.confirm(orderId, ConfirmationSource.DEMO_SIMULATED);
+        return orderService.confirmDemoPayment(currentUser.id(), orderId);
     }
 }

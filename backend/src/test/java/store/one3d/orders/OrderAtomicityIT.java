@@ -9,6 +9,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
 import store.one3d.support.CatalogFixtures;
 import store.one3d.support.PostgresIntegrationTest;
+import store.one3d.support.TestUsers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -74,7 +75,7 @@ class OrderAtomicityIT {
     void failedLineInsertRollsBackTheOrderInsert() {
         long ordersBefore = countOrders();
 
-        assertThatThrownBy(() -> orderService.placeOrder(faultyItem.configurationId(), 1))
+        assertThatThrownBy(() -> orderService.placeOrder(TestUsers.LEGACY_CUSTOMER_ID, faultyItem.configurationId(), 1))
                 .rootCause()
                 .hasMessageContaining(INJECTED_FAILURE);
 

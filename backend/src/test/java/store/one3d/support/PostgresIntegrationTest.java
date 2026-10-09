@@ -27,7 +27,7 @@ import java.lang.annotation.Target;
         "one3d.worker.retry-backoff=0s",
         "one3d.simulator.request-timeout=2s"})
 @AutoConfigureMockMvc
-@Import(TestcontainersConfiguration.class)
+@Import({TestcontainersConfiguration.class, SignedInByDefault.class})
 @ActiveProfiles("demo")
 public @interface PostgresIntegrationTest {
 }

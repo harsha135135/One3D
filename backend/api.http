@@ -2,7 +2,11 @@
 # client or the VS Code "REST Client" extension. These requests mirror the
 # curl commands recorded in docs/evidence/2026-10-07-checkpoint-1.md; this
 # file itself has not been executed through an HTTP client.
-# The API is unauthenticated in Checkpoint 1 and listens on 127.0.0.1 only.
+# Since Checkpoint 4 every request except the catalog needs a signed-in session,
+# and state changes need the X-XSRF-TOKEN header. Sign in through the frontend
+# (http://localhost:3000) and copy the JSESSIONID and XSRF-TOKEN cookies, or use
+# docs/evidence/2026-10-09-checkpoint-4/real-stack/sign-in-and-security.sh,
+# which signs in with curl. The API listens on 127.0.0.1 only.
 
 @baseUrl = http://127.0.0.1:8080
 @demoConfigurationId = 0d3d0000-0000-4000-8000-000000000002

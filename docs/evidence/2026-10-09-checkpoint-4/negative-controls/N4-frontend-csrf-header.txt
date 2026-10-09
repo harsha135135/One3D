@@ -1,0 +1,21 @@
+  ✘  2 [desktop] › tests/smoke.spec.ts:88:5 › a customer orders and pays (demo) using only the keyboard, sending the CSRF header (432ms)
+  ✘  1 [phone] › tests/smoke.spec.ts:88:5 › a customer orders and pays (demo) using only the keyboard, sending the CSRF header (437ms)
+  1) [desktop] › tests/smoke.spec.ts:88:5 › a customer orders and pays (demo) using only the keyboard, sending the CSRF header 
+    - Expected  - 2
+    + Received  + 2
+    -   "csrf-123",
+    -   "csrf-123",
+    +   undefined,
+    +   undefined,
+    > 118 |   expect(csrfHeaders).toEqual(["csrf-123", "csrf-123"]);
+  2) [phone] › tests/smoke.spec.ts:88:5 › a customer orders and pays (demo) using only the keyboard, sending the CSRF header 
+    - Expected  - 2
+    + Received  + 2
+    -   "csrf-123",
+    -   "csrf-123",
+    +   undefined,
+    +   undefined,
+    > 118 |   expect(csrfHeaders).toEqual(["csrf-123", "csrf-123"]);
+  2 failed
+    [desktop] › tests/smoke.spec.ts:88:5 › a customer orders and pays (demo) using only the keyboard, sending the CSRF header 
+    [phone] › tests/smoke.spec.ts:88:5 › a customer orders and pays (demo) using only the keyboard, sending the CSRF header 

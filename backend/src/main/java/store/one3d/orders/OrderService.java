@@ -2,10 +2,13 @@ package store.one3d.orders;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.PageRequest;
 import store.one3d.catalog.CatalogService;
 import store.one3d.catalog.CatalogSnapshot;
+import store.one3d.common.PageResponse;
 import store.one3d.common.Timestamps;
 
+import java.util.Collection;
 import java.util.UUID;
 
 /** Order use cases. Each public method is one database transaction. */
@@ -29,23 +32,32 @@ public class OrderService {
      * without its line.
      */
     @Transactional
-    public OrderResponse placeOrder(UUID configurationId, int quantity) {
+    public OrderResponse placeOrder(UUID customerId, UUID configurationId, int quantity) {
         CatalogSnapshot item = catalogService.findOrderable(configurationId)
                 .orElseThrow(() -> new ConfigurationNotOrderableException(configurationId));
 
-        CustomerOrder order = orders.save(CustomerOrder.place(item, quantity, Timestamps.now()));
+        CustomerOrder order = orders.save(CustomerOrder.place(customerId, item, quantity, Timestamps.now()));
         return OrderResponse.from(order);
     }
 
     /**
-     * Confirms an order as commercially eligible. In V1 the only caller is the
-     * demo-only {@link DemoPaymentController}; Checkpoint 6 adds verified
-     * test-mode payments. Confirmation never creates a job or starts a printer.
+     * Confirms an order as commercially eligible, for any confirmation source.
+     * Checkpoint 6 calls it after a verified test-mode payment; the demo
+     * shortcut uses {@link #confirmDemoPayment}. Confirmation never creates a
+     * job or starts a printer.
      */
     @Transactional
     public OrderResponse confirm(UUID orderId, ConfirmationSource source) {
         CustomerOrder order = findOrder(orderId);
         order.confirm(source, Timestamps.now());
+        return OrderResponse.from(order);
+    }
+
+    /** Demo-only payment for the customer's own order; another customer's order is not found. */
+    @Transactional
+    public OrderResponse confirmDemoPayment(UUID customerId, UUID orderId) {
+        CustomerOrder order = findOwnedOrder(customerId, orderId);
+        order.confirm(ConfirmationSource.DEMO_SIMULATED, Timestamps.now());
         return OrderResponse.from(order);
     }
 
@@ -65,9 +77,33 @@ public class OrderService {
         return OrderResponse.from(order);
     }
 
+    /** Any order, for operators and other modules. Customers use {@link #getOwnOrder}. */
     @Transactional(readOnly = true)
     public OrderResponse getOrder(UUID orderId) {
         return OrderResponse.from(findOrder(orderId));
+    }
+
+    /** The customer's own order; another customer's order is "not found", not "forbidden". */
+    @Transactional(readOnly = true)
+    public OrderResponse getOwnOrder(UUID customerId, UUID orderId) {
+        return OrderResponse.from(findOwnedOrder(customerId, orderId));
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<OrderResponse> listOwnOrders(UUID customerId, int page, int size) {
+        return PageResponse.of(orders.findByCustomerIdOrderByCreatedAtDesc(customerId,
+                PageRequest.of(PageResponse.page(page), PageResponse.size(size))), OrderResponse::from);
+    }
+
+    /** Orders in the given states, oldest first, for the operator queue. */
+    @Transactional(readOnly = true)
+    public PageResponse<OrderResponse> listByStatus(Collection<OrderStatus> statuses, int page, int size) {
+        return PageResponse.of(orders.findByStatusInOrderByCreatedAtAsc(statuses,
+                PageRequest.of(PageResponse.page(page), PageResponse.size(size))), OrderResponse::from);
+    }
+
+    private CustomerOrder findOwnedOrder(UUID customerId, UUID orderId) {
+        return orders.findOwnedWithLine(orderId, customerId).orElseThrow(() -> new OrderNotFoundException(orderId));
     }
 
     private CustomerOrder findOrder(UUID orderId) {

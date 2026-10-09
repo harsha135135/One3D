@@ -15,6 +15,8 @@ class CustomerOrderTest {
 
     private static final Instant NOW = Instant.parse("2026-10-07T08:00:00Z");
 
+    private static final UUID CUSTOMER = UUID.fromString("00000000-0000-4000-8000-0000000000c1");
+
     private static final CatalogSnapshot ITEM = new CatalogSnapshot(
             UUID.fromString("00000000-0000-4000-8000-00000000000a"),
             "Hex Desk Organizer",
@@ -27,8 +29,9 @@ class CustomerOrderTest {
 
     @Test
     void newOrderAwaitsPaymentAndCopiesTheCatalogValues() {
-        CustomerOrder order = CustomerOrder.place(ITEM, 1, NOW);
+        CustomerOrder order = CustomerOrder.place(CUSTOMER, ITEM, 1, NOW);
 
+        assertThat(order.getCustomerId()).isEqualTo(CUSTOMER);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.AWAITING_PAYMENT);
         assertThat(order.getCreatedAt()).isEqualTo(NOW);
 
@@ -45,15 +48,15 @@ class CustomerOrderTest {
 
     @Test
     void totalIsUnitPriceTimesQuantityInTheLineCurrency() {
-        assertThat(CustomerOrder.place(ITEM, 1, NOW).total()).isEqualTo(new Money(49_900, "INR"));
+        assertThat(CustomerOrder.place(CUSTOMER, ITEM, 1, NOW).total()).isEqualTo(new Money(49_900, "INR"));
     }
 
     @Test
     void quantityOtherThanOneIsRejectedEvenIfRequestValidationIsBypassed() {
-        assertThatThrownBy(() -> CustomerOrder.place(ITEM, 2, NOW))
+        assertThatThrownBy(() -> CustomerOrder.place(CUSTOMER, ITEM, 2, NOW))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("quantity 1");
-        assertThatThrownBy(() -> CustomerOrder.place(ITEM, 0, NOW))
+        assertThatThrownBy(() -> CustomerOrder.place(CUSTOMER, ITEM, 0, NOW))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }
