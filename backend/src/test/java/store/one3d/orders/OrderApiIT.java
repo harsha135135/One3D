@@ -76,17 +76,47 @@ class OrderApiIT {
     }
 
     @Test
-    void missingQuantityIsRejected() throws Exception {
-        placeOrder("""
+    void missingQuantityDefaultsToOne() throws Exception {
+        String created = placeOrder("""
                 {"productConfigurationId": "%s"}
+                """.formatted(DEMO_CONFIGURATION_ID))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.line.quantity").value(1))
+                .andExpect(jsonPath("$.total.amountMinor").value(49900))
+                .andReturn().getResponse().getContentAsString();
+
+        String orderId = JsonPath.read(created, "$.id");
+
+        mvc.perform(get("/api/orders/{id}", orderId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.line.quantity").value(1));
+    }
+
+    @Test
+    void explicitNullQuantityDefaultsToOne() throws Exception {
+        placeOrder("""
+                {"productConfigurationId": "%s", "quantity": null}
+                """.formatted(DEMO_CONFIGURATION_ID))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.line.quantity").value(1));
+    }
+
+    @Test
+    void zeroQuantityIsRejectedAndNothingIsStored() throws Exception {
+        long ordersBefore = countOrders();
+
+        placeOrder("""
+                {"productConfigurationId": "%s", "quantity": 0}
                 """.formatted(DEMO_CONFIGURATION_ID))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.errors[0].field").value("quantity"));
+
+        assertThat(countOrders()).isEqualTo(ordersBefore);
     }
 
     @Test
-    void quantityOtherThanOneIsRejectedAndNothingIsStored() throws Exception {
+    void quantityTwoIsRejectedAndNothingIsStored() throws Exception {
         long ordersBefore = countOrders();
 
         placeOrder("""
@@ -95,7 +125,8 @@ class OrderApiIT {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.errors[0].field").value("quantity"))
-                .andExpect(jsonPath("$.errors[0].message").value(containsString("must be 1")));
+                .andExpect(jsonPath("$.errors[0].message")
+                        .value(containsString("must be 1")));
 
         assertThat(countOrders()).isEqualTo(ordersBefore);
     }
