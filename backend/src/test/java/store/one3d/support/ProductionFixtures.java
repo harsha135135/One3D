@@ -56,6 +56,19 @@ public final class ProductionFixtures {
         return jobId;
     }
 
+    /** A start command for an attempt, as the backend records it before dispatch. */
+    public UUID insertCommand(UUID attemptId, UUID printerId, UUID jobId) {
+        UUID commandId = UUID.randomUUID();
+        jdbc.sql("""
+                        INSERT INTO printer_command (id, attempt_id, printer_id, job_id, payload_hash, status,
+                                                     created_at, updated_at)
+                        VALUES (?, ?, ?, ?, 'hash', 'PENDING', now(), now())
+                        """)
+                .params(commandId, attemptId, printerId, jobId)
+                .update();
+        return commandId;
+    }
+
     public UUID insertAttempt(UUID jobId, int attemptNumber, UUID printerId, String status,
                               String failureReason, String qcResult) {
         UUID attemptId = UUID.randomUUID();

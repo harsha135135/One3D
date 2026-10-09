@@ -9,6 +9,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import store.one3d.support.ApiSteps;
 import store.one3d.support.PostgresIntegrationTest;
 import store.one3d.support.ProductionFixtures;
+import store.one3d.support.SimulatorRig;
 
 import java.util.Map;
 import java.util.UUID;
@@ -29,13 +30,22 @@ class ProductionTransitionsIT {
     @Autowired
     JdbcClient jdbc;
 
+    @Autowired
+    DispatchWorker worker;
+
+    @Autowired
+    ExecutionObserver observer;
+
+    @Autowired
+    SimulatorRig simulator;
+
     private ApiSteps api;
     private ProductionFixtures fixtures;
     private String printerId;
 
     @BeforeEach
     void setUp() {
-        api = new ApiSteps(mvc);
+        api = new ApiSteps(mvc, worker, observer, simulator);
         fixtures = new ProductionFixtures(jdbc);
         printerId = fixtures.clearPrinter().toString();
     }
@@ -113,14 +123,17 @@ class ProductionTransitionsIT {
     }
 
     @Test
-    void anEndedAttemptCannotBeCompletedOrFailedAgain() throws Exception {
-        String attemptId = api.startAttempt(api.releasedJob(), printerId);
+    void anEndedAttemptCannotEndAgain() throws Exception {
+        String jobId = api.releasedJob();
+        String attemptId = api.startAttempt(jobId, printerId);
         api.complete(attemptId);
 
-        expectConflict(api.post("/api/ops/attempts/" + attemptId + "/simulate-completion"), "ATTEMPT_NOT_RUNNING");
-        expectConflict(api.post("/api/ops/attempts/" + attemptId + "/simulate-failure", """
-                {"reason": "too late"}
-                """), "ATTEMPT_NOT_RUNNING");
+        // The printer has nothing running any more, and observing again changes nothing.
+        assertThat(simulator.fail(printerId, "too late")).startsWith("409").contains("NOT_RUNNING");
+        api.observe();
+        api.get("/api/ops/jobs/" + jobId)
+                .andExpect(jsonPath("$.status").value("AWAITING_QC"))
+                .andExpect(jsonPath("$.attempts[0].status").value("COMPLETED"));
     }
 
     @Test
@@ -156,11 +169,11 @@ class ProductionTransitionsIT {
 
     @Test
     void theBedCannotBeClearedWhilePrintingOrWhenAlreadyClear() throws Exception {
-        expectConflict(api.post("/api/ops/printers/" + printerId + "/clear-bed"), "BED_ALREADY_CLEAR");
+        expectConflict(api.clearBedRequest(printerId, UUID.randomUUID().toString()), "BED_ALREADY_CLEAR");
 
-        api.startAttempt(api.releasedJob(), printerId);
+        String running = api.startAttempt(api.releasedJob(), printerId);
 
-        expectConflict(api.post("/api/ops/printers/" + printerId + "/clear-bed"), "PRINTER_BUSY");
+        expectConflict(api.clearBedRequest(printerId, running), "PRINTER_BUSY");
     }
 
     @Test
@@ -183,9 +196,9 @@ class ProductionTransitionsIT {
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("ORDER_NOT_FOUND"));
         api.get("/api/ops/jobs/" + unknown)
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("JOB_NOT_FOUND"));
-        api.post("/api/ops/attempts/" + unknown + "/simulate-completion")
+        api.post("/api/ops/attempts/" + unknown + "/reconcile")
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("ATTEMPT_NOT_FOUND"));
-        api.post("/api/ops/printers/" + unknown + "/clear-bed")
+        api.clearBedRequest(unknown.toString(), UUID.randomUUID().toString())
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("PRINTER_NOT_FOUND"));
         api.startAttemptRequest(api.releasedJob(), unknown.toString())
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("PRINTER_NOT_FOUND"));
@@ -199,11 +212,9 @@ class ProductionTransitionsIT {
                 .andExpect(jsonPath("$.errors[0].field").value("printerId"));
 
         String attemptId = api.startAttempt(jobId, printerId);
-        api.post("/api/ops/attempts/" + attemptId + "/simulate-failure", """
-                        {"reason": " "}
-                        """)
+        api.post("/api/ops/printers/" + printerId + "/clear-bed", "{}")
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors[0].field").value("reason"));
+                .andExpect(jsonPath("$.errors[0].field").value("attemptId"));
         api.post("/api/ops/attempts/" + attemptId + "/qc", """
                         {"result": "MAYBE"}
                         """)

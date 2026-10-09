@@ -1,5 +1,6 @@
 package store.one3d.production;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import store.one3d.common.ConflictException;
@@ -9,7 +10,9 @@ import store.one3d.orders.OrderResponse;
 import store.one3d.orders.OrderService;
 import store.one3d.orders.ReleasableOrder;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -19,7 +22,8 @@ import java.util.UUID;
  *
  * <p>Nothing here runs automatically: every step is an explicit operator call,
  * and placing or paying for an order never creates a job or starts a printer.
- * Concurrent operator calls are not yet protected (Checkpoint 3).
+ * Talking to the simulator happens later, in {@link DispatchWorker}, outside
+ * these transactions.
  */
 @Service
 public class ProductionService {
@@ -28,23 +32,38 @@ public class ProductionService {
     private final ProductionJobRepository jobs;
     private final PrintAttemptRepository attempts;
     private final PrinterRepository printers;
+    private final BedClearanceRepository clearances;
+    private final PrinterCommandRepository commands;
+    private final PendingWorkStore work;
+    private final int maxDispatchTries;
 
-    ProductionService(OrderService orderService, ProductionJobRepository jobs,
-                      PrintAttemptRepository attempts, PrinterRepository printers) {
+    ProductionService(OrderService orderService, ProductionJobRepository jobs, PrintAttemptRepository attempts,
+                      PrinterRepository printers, BedClearanceRepository clearances,
+                      PrinterCommandRepository commands, PendingWorkStore work,
+                      @Value("${one3d.worker.max-attempts}") int maxDispatchTries) {
         this.orderService = orderService;
         this.jobs = jobs;
         this.attempts = attempts;
         this.printers = printers;
+        this.clearances = clearances;
+        this.commands = commands;
+        this.work = work;
+        this.maxDispatchTries = maxDispatchTries;
     }
 
-    /** Creates the order's job. The order must be CONFIRMED and not yet released. */
+    /**
+     * Creates the order's job. The order must be CONFIRMED and not yet released.
+     * Two simultaneous releases are stopped by the unique constraint on the
+     * order id; the loser gets 409 ALREADY_RELEASED.
+     */
     @Transactional
     public JobResponse release(UUID orderId) {
         ReleasableOrder order = orderService.requireReleasable(orderId);
         if (jobs.existsByOrderId(orderId)) {
             throw new ConflictException("ALREADY_RELEASED", "Order " + orderId + " already has a production job.");
         }
-        ProductionJob job = jobs.save(ProductionJob.release(order.orderId(), order.recipeRevisionId(), Timestamps.now()));
+        ProductionJob job = jobs.saveAndFlush(
+                ProductionJob.release(order.orderId(), order.recipeRevisionId(), Timestamps.now()));
         return JobResponse.from(job);
     }
 
@@ -53,29 +72,30 @@ public class ProductionService {
         return JobResponse.from(findJob(jobId));
     }
 
-    /** Starts the job's next attempt on the given printer. */
+    /**
+     * Records the intent to start the job's next attempt on a printer, in one
+     * transaction:
+     * <ol>
+     *   <li>lock the printer row, so a competing start waits and then sees it busy;</li>
+     *   <li>create the attempt (START_INTENT) and reserve the printer and bed;</li>
+     *   <li>consume the operator's clearance of the previous print, if any;</li>
+     *   <li>store the start command and the work row that will deliver it.</li>
+     * </ol>
+     * The simulator is contacted afterwards by the dispatch worker.
+     */
     @Transactional
     public JobResponse startAttempt(UUID jobId, UUID printerId) {
         ProductionJob job = findJob(jobId);
-        job.startAttempt(findPrinter(printerId), Timestamps.now());
-        return JobResponse.from(job);
-    }
+        Printer printer = printers.findForUpdate(printerId).orElseThrow(() -> printerNotFound(printerId));
+        Optional<BedClearance> clearance = clearances.findByPrinterIdAndConsumedByAttemptIdIsNull(printerId);
+        Instant now = Timestamps.now();
 
-    /** Stands in for the printer reporting a finished print (Checkpoint 3 adds a separate simulator). */
-    @Transactional
-    public JobResponse simulateCompletion(UUID attemptId) {
-        PrintAttempt attempt = findAttempt(attemptId);
-        ProductionJob job = attempt.getJob();
-        job.completeAttempt(attempt, findPrinter(attempt.getPrinterId()), Timestamps.now());
-        return JobResponse.from(job);
-    }
-
-    /** Stands in for the printer reporting a failed or aborted print. */
-    @Transactional
-    public JobResponse simulateFailure(UUID attemptId, String reason) {
-        PrintAttempt attempt = findAttempt(attemptId);
-        ProductionJob job = attempt.getJob();
-        job.failAttempt(attempt, findPrinter(attempt.getPrinterId()), reason, Timestamps.now());
+        PrintAttempt attempt = attempts.save(job.startAttempt(printer, now));
+        clearance.ifPresent(c -> c.consumeFor(attempt.getId()));
+        UUID clearedAttemptId = clearance.map(BedClearance::getClearedAttemptId).orElse(null);
+        PrinterCommand command = commands.saveAndFlush(
+                PrinterCommand.start(attempt, job.getRecipeRevisionId(), clearedAttemptId, now));
+        work.enqueueDispatch(command.getId(), maxDispatchTries);
         return JobResponse.from(job);
     }
 
@@ -85,6 +105,23 @@ public class ProductionService {
         ProductionJob job = attempt.getJob();
         job.recordQc(attempt, result, notes, Timestamps.now());
         return JobResponse.from(job);
+    }
+
+    /**
+     * Asks again for an attempt whose start could not be confirmed and whose
+     * automatic retries ran out. It does not start anything new: the same
+     * command is checked against the simulator's journal.
+     */
+    @Transactional
+    public JobResponse retryReconciliation(UUID attemptId) {
+        PrintAttempt attempt = findAttempt(attemptId);
+        PrinterCommand command = commands.findByAttemptId(attemptId).orElseThrow(() -> new ConflictException(
+                "NOTHING_TO_RECONCILE", "Attempt " + attemptId + " has no start command."));
+        if (work.requeueExhausted(command.getId()) == 0) {
+            throw new ConflictException("NOTHING_TO_RECONCILE",
+                    "Attempt " + attemptId + " has no exhausted delivery to retry.");
+        }
+        return JobResponse.from(attempt.getJob());
     }
 
     /** Marks the order ready for handoff, but only if its job has an accepted part. */
@@ -102,11 +139,23 @@ public class ProductionService {
         return printers.findAllByOrderByName().stream().map(PrinterResponse::from).toList();
     }
 
+    /**
+     * An operator confirms that the print of {@code clearedAttemptId} was
+     * removed. It must be the print on the bed now; see {@link Printer#clearBed}.
+     */
     @Transactional
-    public PrinterResponse clearBed(UUID printerId) {
-        Printer printer = findPrinter(printerId);
-        printer.clearBed(Timestamps.now());
+    public PrinterResponse clearBed(UUID printerId, UUID clearedAttemptId) {
+        Printer printer = printers.findForUpdate(printerId).orElseThrow(() -> printerNotFound(printerId));
+        Instant now = Timestamps.now();
+        printer.clearBed(clearedAttemptId, now);
+        clearances.save(new BedClearance(printerId, clearedAttemptId, now));
         return PrinterResponse.from(printer);
+    }
+
+    /** Delivery work in a given state, for example EXHAUSTED work that needs an operator. */
+    @Transactional(readOnly = true)
+    public List<PendingWorkStore.WorkView> listWork(String status) {
+        return work.list(status);
     }
 
     private ProductionJob findJob(UUID jobId) {
@@ -119,8 +168,7 @@ public class ProductionService {
                 .orElseThrow(() -> new NotFoundException("ATTEMPT_NOT_FOUND", "Attempt " + attemptId + " was not found."));
     }
 
-    private Printer findPrinter(UUID printerId) {
-        return printers.findById(printerId)
-                .orElseThrow(() -> new NotFoundException("PRINTER_NOT_FOUND", "Printer " + printerId + " was not found."));
+    private static NotFoundException printerNotFound(UUID printerId) {
+        return new NotFoundException("PRINTER_NOT_FOUND", "Printer " + printerId + " was not found.");
     }
 }

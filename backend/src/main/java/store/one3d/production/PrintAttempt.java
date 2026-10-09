@@ -9,15 +9,17 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import store.one3d.common.ConflictException;
 
 import java.time.Instant;
+import java.util.Set;
 import java.util.UUID;
 
 /**
  * One execution of a production job on a printer. A retry is a new attempt;
- * an ended attempt keeps its outcome, failure reason and QC result.
- * Change it only through {@link ProductionJob}, which keeps the job in step.
+ * an ended attempt keeps its outcome, reason and QC result. Change it only
+ * through {@link ProductionJob}, which keeps the job and printer in step.
  */
 @Entity
 @Table(name = "print_attempt")
@@ -27,6 +29,11 @@ class PrintAttempt {
     // attempt id as its owner before the attempt row is inserted.
     @Id
     private UUID id;
+
+    // A wrapper type: null marks a new attempt, so Spring Data persists it
+    // instead of merging (the id is assigned in the constructor).
+    @Version
+    private Long version;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "job_id")
@@ -64,23 +71,44 @@ class PrintAttempt {
         // for JPA
     }
 
+    /** A new attempt has been decided and recorded, but the printer has not confirmed it yet. */
     PrintAttempt(ProductionJob job, int attemptNumber, UUID printerId, Instant startedAt) {
         this.id = UUID.randomUUID();
         this.job = job;
         this.attemptNumber = attemptNumber;
         this.printerId = printerId;
-        this.status = AttemptStatus.RUNNING;
+        this.status = AttemptStatus.START_INTENT;
         this.startedAt = startedAt;
     }
 
+    /** The simulator's journal confirms the start. */
+    void markRunning() {
+        require(Set.of(AttemptStatus.START_INTENT, AttemptStatus.RECONCILIATION_REQUIRED, AttemptStatus.RUNNING));
+        status = AttemptStatus.RUNNING;
+    }
+
+    /** The start was sent but its outcome is unknown. Ownership is kept until reconciled. */
+    void markReconciliationRequired() {
+        require(Set.of(AttemptStatus.START_INTENT, AttemptStatus.RECONCILIATION_REQUIRED));
+        status = AttemptStatus.RECONCILIATION_REQUIRED;
+    }
+
+    /** The simulator refused the start; nothing was printed. */
+    void rejectBeforeStart(String reason, Instant now) {
+        require(Set.of(AttemptStatus.START_INTENT, AttemptStatus.RECONCILIATION_REQUIRED));
+        status = AttemptStatus.REJECTED_BEFORE_START;
+        failureReason = reason;
+        endedAt = now;
+    }
+
     void complete(Instant now) {
-        requireRunning();
+        require(Set.of(AttemptStatus.RUNNING));
         status = AttemptStatus.COMPLETED;
         endedAt = now;
     }
 
     void fail(String reason, Instant now) {
-        requireRunning();
+        require(Set.of(AttemptStatus.RUNNING));
         status = AttemptStatus.FAILED;
         failureReason = reason;
         endedAt = now;
@@ -100,10 +128,16 @@ class PrintAttempt {
         qcRecordedAt = now;
     }
 
-    private void requireRunning() {
-        if (status != AttemptStatus.RUNNING) {
-            throw new ConflictException("ATTEMPT_NOT_RUNNING",
-                    "Attempt " + attemptNumber + " is " + status + ", not RUNNING.");
+    /** Attempts that reached the printer count toward the limit; refused starts do not. */
+    boolean countsTowardLimit() {
+        return status != AttemptStatus.REJECTED_BEFORE_START;
+    }
+
+    private void require(Set<AttemptStatus> allowed) {
+        if (!allowed.contains(status)) {
+            throw new ConflictException(status == AttemptStatus.START_INTENT || status == AttemptStatus.RECONCILIATION_REQUIRED
+                    ? "ATTEMPT_NOT_STARTED" : "ATTEMPT_NOT_RUNNING",
+                    "Attempt " + attemptNumber + " is " + status + ".");
         }
     }
 

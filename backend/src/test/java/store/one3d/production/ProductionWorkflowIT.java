@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import store.one3d.support.ApiSteps;
 import store.one3d.support.PostgresIntegrationTest;
 import store.one3d.support.ProductionFixtures;
+import store.one3d.support.SimulatorRig;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -20,9 +21,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * The Checkpoint 2 demonstrations: an order goes through release, printing and
- * QC to readiness for handoff; failed attempts are kept; the bed is never
- * cleared automatically; a failed QC blocks handoff.
+ * The production workflow end to end, with the printer simulator as a separate
+ * process: an order goes through release, a dispatched print and QC to
+ * readiness for handoff; failed attempts are kept; the bed is never cleared
+ * automatically; a failed QC blocks handoff.
  */
 @PostgresIntegrationTest
 class ProductionWorkflowIT {
@@ -33,17 +35,26 @@ class ProductionWorkflowIT {
     @Autowired
     JdbcClient jdbc;
 
+    @Autowired
+    DispatchWorker worker;
+
+    @Autowired
+    ExecutionObserver observer;
+
+    @Autowired
+    SimulatorRig simulator;
+
     private ApiSteps api;
     private String printerId;
 
     @BeforeEach
     void setUp() {
-        api = new ApiSteps(mvc);
+        api = new ApiSteps(mvc, worker, observer, simulator);
         printerId = new ProductionFixtures(jdbc).clearPrinter().toString();
     }
 
     @Test
-    void anOrderGoesFromReleaseThroughPrintAndQcToReadyForHandoff() throws Exception {
+    void anOrderGoesFromReleaseThroughADispatchedPrintAndQcToReadyForHandoff() throws Exception {
         String orderId = api.placeOrder();
 
         api.post("/api/demo/orders/" + orderId + "/simulate-payment")
@@ -60,23 +71,28 @@ class ProductionWorkflowIT {
                 .andExpect(jsonPath("$.attempts", hasSize(0)))
                 .andReturn().getResponse().getContentAsString();
         String jobId = JsonPath.read(released, "$.id");
-        api.get("/api/ops/jobs/" + jobId).andExpect(status().isOk());
 
+        // The operator's request records the intent; the simulator is told afterwards.
         api.startAttemptRequest(jobId, printerId)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PRINTING"))
                 .andExpect(jsonPath("$.attempts[0].attemptNumber").value(1))
-                .andExpect(jsonPath("$.attempts[0].status").value("RUNNING"))
+                .andExpect(jsonPath("$.attempts[0].status").value("START_INTENT"))
                 .andExpect(jsonPath("$.attempts[0].printerId").value(printerId));
-        String attemptId = attemptId(jobId, 0);
+        String attemptId = JsonPath.read(api.jobJson(jobId), "$.attempts[0].id");
         expectPrinter("OCCUPIED", attemptId);
 
-        api.post("/api/ops/attempts/" + attemptId + "/simulate-completion")
-                .andExpect(status().isOk())
+        api.dispatch();
+        api.get("/api/ops/jobs/" + jobId).andExpect(jsonPath("$.attempts[0].status").value("RUNNING"));
+        assertThat(simulator.printer(printerId)).contains("\"runningAttemptId\":\"" + attemptId + "\"");
+
+        simulator.complete(printerId);
+        api.observe();
+        api.get("/api/ops/jobs/" + jobId)
                 .andExpect(jsonPath("$.status").value("AWAITING_QC"))
                 .andExpect(jsonPath("$.attempts[0].status").value("COMPLETED"))
                 .andExpect(jsonPath("$.attempts[0].endedAt").value(notNullValue()));
-        expectPrinter("OCCUPIED", null); // idle, but the part is still on the bed
+        expectPrinter("OCCUPIED", null); // free, but the part is still on the bed
 
         api.qc(attemptId, "PASSED")
                 .andExpect(status().isOk())
@@ -91,9 +107,10 @@ class ProductionWorkflowIT {
         api.get("/api/orders/" + orderId)
                 .andExpect(jsonPath("$.status").value("READY_FOR_HANDOFF"));
 
-        api.post("/api/ops/printers/" + printerId + "/clear-bed")
+        api.clearBedRequest(printerId, attemptId)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.bedState").value("CLEAR"));
+                .andExpect(jsonPath("$.bedState").value("CLEAR"))
+                .andExpect(jsonPath("$.bedCycleAttemptId").value(nullValue()));
     }
 
     @Test
@@ -101,10 +118,8 @@ class ProductionWorkflowIT {
         String jobId = api.releasedJob();
         String firstAttempt = api.startAttempt(jobId, printerId);
 
-        api.post("/api/ops/attempts/" + firstAttempt + "/simulate-failure", """
-                        {"reason": "First layer detached"}
-                        """)
-                .andExpect(status().isOk())
+        api.fail(firstAttempt, "First layer detached");
+        api.get("/api/ops/jobs/" + jobId)
                 .andExpect(jsonPath("$.status").value("RELEASED"))
                 .andExpect(jsonPath("$.attempts[0].status").value("FAILED"))
                 .andExpect(jsonPath("$.attempts[0].failureReason").value("First layer detached"));
@@ -119,8 +134,8 @@ class ProductionWorkflowIT {
                 .andExpect(jsonPath("$.attempts", hasSize(1)));
 
         api.clearBed(printerId);
-        api.startAttemptRequest(jobId, printerId)
-                .andExpect(status().isCreated())
+        api.startAttempt(jobId, printerId);
+        api.get("/api/ops/jobs/" + jobId)
                 .andExpect(jsonPath("$.attempts", hasSize(2)))
                 .andExpect(jsonPath("$.attempts[0].attemptNumber").value(1))
                 .andExpect(jsonPath("$.attempts[0].status").value("FAILED"))
@@ -140,9 +155,10 @@ class ProductionWorkflowIT {
                 .andExpect(jsonPath("$.code").value("BED_NOT_CLEAR"));
 
         api.clearBed(printerId);
-        api.startAttemptRequest(secondJob, printerId)
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.status").value("PRINTING"));
+        api.startAttempt(secondJob, printerId);
+        api.get("/api/ops/jobs/" + secondJob)
+                .andExpect(jsonPath("$.status").value("PRINTING"))
+                .andExpect(jsonPath("$.attempts[0].status").value("RUNNING"));
     }
 
     @Test
@@ -177,22 +193,22 @@ class ProductionWorkflowIT {
     }
 
     @Test
-    void confirmingAnOrderCreatesNoJobAndLeavesPrintersUntouched() throws Exception {
+    void confirmingAnOrderCreatesNoJobAndSendsNothingToAPrinter() throws Exception {
         String orderId = api.placeConfirmedOrder();
+        api.dispatch();
 
         long jobs = jdbc.sql("SELECT count(*) FROM production_job WHERE order_id = ?::uuid")
                 .param(orderId).query(Long.class).single();
         long attemptsOnPrinter = jdbc.sql("SELECT count(*) FROM print_attempt WHERE printer_id = ?::uuid")
                 .param(printerId).query(Long.class).single();
+        long commandsForPrinter = jdbc.sql("SELECT count(*) FROM printer_command WHERE printer_id = ?::uuid")
+                .param(printerId).query(Long.class).single();
 
         assertThat(jobs).isZero();
         assertThat(attemptsOnPrinter).isZero();
+        assertThat(commandsForPrinter).isZero();
+        assertThat(simulator.printer(printerId)).startsWith("404");
         expectPrinter("CLEAR", null);
-    }
-
-    private String attemptId(String jobId, int index) throws Exception {
-        String body = api.get("/api/ops/jobs/" + jobId).andReturn().getResponse().getContentAsString();
-        return JsonPath.read(body, "$.attempts[" + index + "].id");
     }
 
     private void expectPrinter(String bedState, String currentAttemptId) throws Exception {

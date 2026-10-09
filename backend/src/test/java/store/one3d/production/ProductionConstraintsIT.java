@@ -97,6 +97,64 @@ class ProductionConstraintsIT {
                 () -> fixtures.insertOrder("CONFIRMED", "BANK_TRANSFER"));
     }
 
+    @Test
+    void aPrinterHasAtMostOneActiveAttempt() {
+        UUID otherJob = fixtures.insertJob(fixtures.insertOrder("CONFIRMED", "DEMO_SIMULATED"));
+        fixtures.insertAttempt(jobId, 1, printerId, "RUNNING", null, null);
+
+        assertViolates("print_attempt_one_active_per_printer",
+                () -> fixtures.insertAttempt(otherJob, 1, printerId, "RECONCILIATION_REQUIRED", null, null));
+    }
+
+    @Test
+    void aJobHasAtMostOneActiveAttempt() {
+        UUID otherPrinter = fixtures.clearPrinter();
+        fixtures.insertAttempt(jobId, 1, printerId, "START_INTENT", null, null);
+
+        assertViolates("print_attempt_one_active_per_job",
+                () -> fixtures.insertAttempt(jobId, 2, otherPrinter, "RUNNING", null, null));
+    }
+
+    @Test
+    void anOccupiedBedNamesThePrintOnIt() {
+        assertViolates("printer_bed_cycle_matches_state", () -> jdbc.sql(
+                        "UPDATE printer SET bed_state = 'OCCUPIED', bed_cycle_attempt_id = NULL WHERE id = ?")
+                .params(printerId)
+                .update());
+    }
+
+    @Test
+    void aPrinterHasAtMostOneUnusedClearance() {
+        UUID first = fixtures.insertAttempt(jobId, 1, printerId, "FAILED", "Warping", null);
+        UUID second = fixtures.insertAttempt(jobId, 2, printerId, "FAILED", "Warping", null);
+        insertClearance(first);
+
+        assertViolates("bed_clearance_one_open_per_printer", () -> insertClearance(second));
+    }
+
+    @Test
+    void aClaimedWorkRowCarriesItsClaimToken() {
+        UUID attemptId = fixtures.insertAttempt(jobId, 1, printerId, "START_INTENT", null, null);
+        UUID commandId = fixtures.insertCommand(attemptId, printerId, jobId);
+
+        assertViolates("pending_work_claim_matches_status", () -> jdbc.sql("""
+                        INSERT INTO pending_work (id, kind, command_id, status, attempts, max_attempts,
+                                                  available_at, created_at, updated_at)
+                        VALUES (gen_random_uuid(), 'DISPATCH_START', ?, 'CLAIMED', 1, 5, now(), now(), now())
+                        """)
+                .params(commandId)
+                .update());
+    }
+
+    private void insertClearance(UUID clearedAttemptId) {
+        jdbc.sql("""
+                        INSERT INTO bed_clearance (id, printer_id, cleared_attempt_id, cleared_at)
+                        VALUES (gen_random_uuid(), ?, ?, now())
+                        """)
+                .params(printerId, clearedAttemptId)
+                .update();
+    }
+
     private static void assertViolates(String constraint, Runnable statement) {
         assertThatThrownBy(statement::run)
                 .isInstanceOf(DataIntegrityViolationException.class)

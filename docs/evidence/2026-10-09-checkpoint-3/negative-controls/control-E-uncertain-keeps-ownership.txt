@@ -1,0 +1,4 @@
+[ERROR] Tests run: 10, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 8.826 s <<< FAILURE! -- in store.one3d.production.DispatchReconciliationIT
+[ERROR]   DispatchReconciliationIT.aLostAcknowledgementHoldsThePrinterUntilTheJournalIsChecked:90 
+[ERROR]   DispatchReconciliationIT.anUnreachableSimulatorExhaustsVisiblyAndAnOperatorCanReconcileLater:136 
+[INFO] BUILD SUCCESS

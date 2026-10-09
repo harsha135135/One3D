@@ -3,6 +3,8 @@ package store.one3d.common;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
+import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -34,6 +36,25 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(ApiException.class)
     ResponseEntity<ProblemDetail> handleApiException(ApiException ex) {
         return ResponseEntity.status(ex.getStatus()).body(problem(ex.getStatus(), ex.getCode(), ex.getMessage()));
+    }
+
+    /**
+     * A database rule rejected a write. Known race-protection constraints become
+     * 409 with a specific code; any other violation is a bug and stays a 500.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ResponseEntity<ProblemDetail> handleIntegrityViolation(DataIntegrityViolationException ex) {
+        return ConstraintConflicts.codeFor(ex)
+                .map(code -> ResponseEntity.status(HttpStatus.CONFLICT).body(problem(HttpStatus.CONFLICT, code,
+                        "The request conflicts with a change made at the same time. Reload and try again.")))
+                .orElseGet(() -> handleUnexpected(ex));
+    }
+
+    /** Optimistic version or row-lock conflict: another request changed the same record first. */
+    @ExceptionHandler(ConcurrencyFailureException.class)
+    ResponseEntity<ProblemDetail> handleConcurrencyFailure(ConcurrencyFailureException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(HttpStatus.CONFLICT, "CONCURRENT_MODIFICATION",
+                "The record was changed by another request at the same time. Reload and try again."));
     }
 
     /** Anything unexpected: log the cause on the server, return no internal details. */

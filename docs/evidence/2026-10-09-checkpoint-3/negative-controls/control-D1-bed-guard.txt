@@ -1,0 +1,8 @@
+[ERROR] Tests run: 15, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.093 s <<< FAILURE! -- in store.one3d.production.ProductionJobTest
+[ERROR]   ProductionJobTest.anOccupiedBedBlocksTheNextStartAndLeavesTheJobUnchanged:121 
+[ERROR] Tests run: 5, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 7.318 s <<< FAILURE! -- in store.one3d.production.ProductionWorkflowIT
+[ERROR] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.232 s <<< FAILURE! -- in store.one3d.production.BedClearanceIT
+[ERROR]   BedClearanceIT.aDelayedClearanceForAnEarlierPrintLeavesTheLaterPrintOnTheBed:65 Status expected:<409> but was:<201>
+[ERROR]   ProductionWorkflowIT.aCompletedPrintKeepsTheBedOccupiedUntilAnOperatorClearsIt:154 Status expected:<409> but was:<201>
+[ERROR]   ProductionWorkflowIT.aFailedAttemptIsKeptAndARetryCreatesAttemptTwo:130 Status expected:<409> but was:<201>
+[INFO] BUILD SUCCESS

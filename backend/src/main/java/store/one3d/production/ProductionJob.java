@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import store.one3d.common.ConflictException;
 
 import java.time.Instant;
@@ -22,18 +23,24 @@ import java.util.UUID;
 /**
  * The manufacturing work for one order: planned output, attempts and QC.
  * All job, attempt and printer state changes go through these methods so the
- * three stay consistent. See {@link JobStatus} for the allowed transitions.
+ * three stay consistent. See {@link JobStatus} and {@link AttemptStatus}.
  */
 @Entity
 @Table(name = "production_job")
 class ProductionJob {
 
-    /** Attempts allowed per job in total, whether earlier ones failed to print or failed QC. */
+    /**
+     * Attempts allowed per job in total, whether earlier ones failed to print or
+     * failed QC. Starts the simulator refused (nothing printed) do not count.
+     */
     static final int MAX_ATTEMPTS = 3;
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+
+    @Version
+    private long version;
 
     // Plain ids: the order and recipe belong to other modules.
     @Column(name = "order_id", updatable = false)
@@ -70,17 +77,18 @@ class ProductionJob {
     }
 
     /**
-     * Starts the next attempt on a printer. The operator's request is the
-     * authorization: a retry after a failure or failed QC needs another call,
-     * up to {@link #MAX_ATTEMPTS} attempts in total.
+     * Records the intent to start the next attempt and reserves the printer for
+     * it. The printer is only told afterwards, by the dispatch worker. The
+     * operator's request is the authorization: nothing retries by itself.
      */
     PrintAttempt startAttempt(Printer printer, Instant now) {
         requireStatus(JobStatus.RELEASED, "JOB_NOT_RELEASED");
         // Checked before the printer is touched: a job at its limit leaves the
         // printer as it was, even when the printer could take the print.
-        if (attempts.size() >= MAX_ATTEMPTS) {
+        long counted = attempts.stream().filter(PrintAttempt::countsTowardLimit).count();
+        if (counted >= MAX_ATTEMPTS) {
             throw new ConflictException("ATTEMPT_LIMIT_REACHED",
-                    "Job " + id + " already has " + attempts.size() + " of " + MAX_ATTEMPTS + " attempts.");
+                    "Job " + id + " already has " + counted + " of " + MAX_ATTEMPTS + " attempts.");
         }
         PrintAttempt attempt = new PrintAttempt(this, attempts.size() + 1, printer.getId(), now);
         // Reserve before changing the job, so a busy printer or an occupied
@@ -89,6 +97,26 @@ class ProductionJob {
         attempts.add(attempt);
         status = JobStatus.PRINTING;
         return attempt;
+    }
+
+    /** The simulator's journal shows the attempt started. */
+    void confirmStarted(PrintAttempt attempt) {
+        requireOwnAttempt(attempt);
+        attempt.markRunning();
+    }
+
+    /** The start was sent but its outcome is unknown; the attempt keeps the printer and the job. */
+    void startOutcomeUnknown(PrintAttempt attempt) {
+        requireOwnAttempt(attempt);
+        attempt.markReconciliationRequired();
+    }
+
+    /** The simulator refused the start. Nothing printed, so the reservation is undone. */
+    void rejectBeforeStart(PrintAttempt attempt, Printer printer, String reason, Instant now) {
+        requireOwnAttempt(attempt);
+        attempt.rejectBeforeStart(reason, now);
+        printer.undoReservation(attempt.getId(), now);
+        status = JobStatus.RELEASED;
     }
 
     /** The printer finished the attempt. The part now needs QC; the bed is not cleared. */

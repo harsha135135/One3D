@@ -29,6 +29,22 @@ server:
   port: 8080
 
 one3d:
+  simulator:
+    # The separate printer simulator process (simulator/). Never public.
+    base-url: ${ONE3D_SIMULATOR_URL:http://127.0.0.1:8090}
+    connect-timeout: 1s
+    request-timeout: 3s
+  worker:
+    # Background delivery of start commands and polling of running prints.
+    enabled: true
+    poll-interval: 1s
+    batch-size: 10
+    # A claimed row is reclaimable after this long, if its worker disappeared.
+    lease: 30s
+    # Tries per start command before the row is EXHAUSTED and shown to operators.
+    max-attempts: 5
+    # Wait before the 2nd try; doubled for each later try.
+    retry-backoff: 2s
   demo:
     # Demo-only shortcut that confirms an order without payment
     # (POST /api/demo/orders/{id}/simulate-payment). Off by default; the "demo"
