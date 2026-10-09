@@ -1,0 +1,18 @@
+[WebServer] ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+
+Running 12 tests using 2 workers
+
+  ✓   2 [phone] › tests/smoke.spec.ts:78:5 › a signed-out visitor sees the catalog and is sent to sign in to order (209ms)
+  ✓   1 [desktop] › tests/smoke.spec.ts:78:5 › a signed-out visitor sees the catalog and is sent to sign in to order (211ms)
+  ✓   3 [phone] › tests/smoke.spec.ts:88:5 › a customer orders and pays (demo) using only the keyboard, sending the CSRF header (305ms)
+  ✓   4 [desktop] › tests/smoke.spec.ts:88:5 › a customer orders and pays (demo) using only the keyboard, sending the CSRF header (303ms)
+  ✓   6 [desktop] › tests/smoke.spec.ts:122:5 › an order that is not the customer's is shown as not found (168ms)
+  ✓   5 [phone] › tests/smoke.spec.ts:122:5 › an order that is not the customer's is shown as not found (169ms)
+  ✓   8 [phone] › tests/smoke.spec.ts:131:5 › a customer does not get operator pages (128ms)
+  ✓   7 [desktop] › tests/smoke.spec.ts:131:5 › a customer does not get operator pages (128ms)
+  ✓   9 [phone] › tests/smoke.spec.ts:138:5 › the operator queue shows a refusal from the API as an alert (223ms)
+  ✓  10 [desktop] › tests/smoke.spec.ts:138:5 › the operator queue shows a refusal from the API as an alert (223ms)
+  ✓  11 [phone] › tests/smoke.spec.ts:156:5 › clearing a bed names the print that is on it (203ms)
+  ✓  12 [desktop] › tests/smoke.spec.ts:156:5 › clearing a bed names the print that is on it (205ms)
+
+  12 passed (2.8s)
