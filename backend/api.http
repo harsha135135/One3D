@@ -46,12 +46,13 @@ Content-Type: application/json
 GET {{baseUrl}}/api/orders/00000000-0000-4000-8000-000000000000
 
 # ---------------------------------------------------------------------------
-# Checkpoint 2: production with the simulated printer.
+# Checkpoints 2-3: production with the simulated printer (docker compose up -d db simulator).
 # Start the API with: ./mvnw spring-boot:run -Dspring-boot.run.profiles=demo
 # These mirror the curl steps in docs/evidence/2026-10-09-checkpoint-2.md;
 # paste the ids from each response into the variables below.
 # ---------------------------------------------------------------------------
 @printerId = 0d3d0000-0000-4000-8000-000000000101
+@simulatorUrl = http://127.0.0.1:8090
 @jobId = 00000000-0000-4000-8000-000000000000
 @attemptId = 00000000-0000-4000-8000-000000000000
 
@@ -61,7 +62,7 @@ POST {{baseUrl}}/api/demo/orders/{{orderId}}/simulate-payment
 ### Release production for a confirmed order -> 201, job RELEASED
 POST {{baseUrl}}/api/ops/orders/{{orderId}}/release
 
-### Start the next attempt on the simulated printer -> 201, job PRINTING
+### Record the start of the next attempt -> 201, attempt START_INTENT; RUNNING once the worker delivers it
 POST {{baseUrl}}/api/ops/jobs/{{jobId}}/attempts
 Content-Type: application/json
 
@@ -69,16 +70,27 @@ Content-Type: application/json
   "printerId": "{{printerId}}"
 }
 
-### Simulated printer reports a failure -> job RELEASED, attempt kept as FAILED
-POST {{baseUrl}}/api/ops/attempts/{{attemptId}}/simulate-failure
+### Simulator dev control (local only): the print fails -> observer marks the attempt FAILED
+POST {{simulatorUrl}}/dev/printers/{{printerId}}/fail
 Content-Type: application/json
 
 {
   "reason": "First layer detached"
 }
 
-### Simulated printer reports completion -> job AWAITING_QC, bed still OCCUPIED
-POST {{baseUrl}}/api/ops/attempts/{{attemptId}}/simulate-completion
+### Simulator dev control (local only): the print finishes -> job AWAITING_QC, bed still OCCUPIED
+POST {{simulatorUrl}}/dev/printers/{{printerId}}/complete
+
+### Simulator dev control (local only): drop the reply to the next start command
+POST {{simulatorUrl}}/dev/printers/{{printerId}}/faults
+Content-Type: application/json
+
+{
+  "dropNextStartAck": true
+}
+
+### What the simulator's journal says about the printer
+GET {{simulatorUrl}}/printers/{{printerId}}
 
 ### Whole-part QC -> PASSED accepts the job; FAILED needs a new attempt
 POST {{baseUrl}}/api/ops/attempts/{{attemptId}}/qc
@@ -89,8 +101,19 @@ Content-Type: application/json
   "notes": "Whole part inspected"
 }
 
-### Operator clears the bed (needed before every new attempt)
+### Operator clears the bed, naming the print that was removed (the printer's bedCycleAttemptId)
 POST {{baseUrl}}/api/ops/printers/{{printerId}}/clear-bed
+Content-Type: application/json
+
+{
+  "attemptId": "{{attemptId}}"
+}
+
+### Retry delivery of a start whose automatic tries ran out
+POST {{baseUrl}}/api/ops/attempts/{{attemptId}}/reconcile
+
+### Delivery work that needs an operator
+GET {{baseUrl}}/api/ops/work?status=EXHAUSTED
 
 ### Mark the order ready for handoff -> 409 JOB_NOT_ACCEPTED until QC passed
 POST {{baseUrl}}/api/ops/orders/{{orderId}}/ready-for-handoff

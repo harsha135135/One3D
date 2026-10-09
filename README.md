@@ -2,9 +2,9 @@
 
 **V1: a focused Java backend portfolio project, built to demonstrate fresher-level engineering skills.**
 
-One3D is the planned custom-manufacturing business of [OneCreations](https://github.com/harsha135135/OneCreations). Its operating software is called **PrintFlow**. Checkpoint 1 of V1 (a catalog order API on Spring Boot and PostgreSQL) is implemented, tested locally and signed off by the owner. Checkpoint 2 (release, jobs, attempts, a simulated printer, bed clearance and QC) is implemented and tested locally; its owner review is pending. Later checkpoints, infrastructure and deployment are not implemented yet, and V1 is not complete.
+One3D is the planned custom-manufacturing business of [OneCreations](https://github.com/harsha135135/OneCreations). Its operating software is called **PrintFlow**. Checkpoint 1 of V1 (a catalog order API on Spring Boot and PostgreSQL) is implemented, tested locally and signed off by the owner. Checkpoint 2 (release, jobs, attempts, bed clearance and QC) and Checkpoint 3 (a separate durable printer simulator, dispatch and reconciliation, protection against concurrent operators) are implemented and tested; their owner reviews are deferred until V1 is complete. Later checkpoints, infrastructure and deployment are not implemented yet, and V1 is not complete.
 
-Status: Checkpoint 1 complete (signed off 2026-10-09; schema explanation reference-assisted, to revisit); Checkpoint 2 implemented and tested locally, owner review pending · Scope updated: 2026-10-07
+Status: Checkpoint 1 complete (signed off 2026-10-09; schema explanation reference-assisted, to revisit); Checkpoints 2–3 implemented and tested, owner reviews deferred until V1 is complete · Scope updated: 2026-10-07
 
 ## What we are building first
 
@@ -45,20 +45,21 @@ These are planned choices, not claims of hands-on experience. The [scope](docs/v
 
 ## Run it locally
 
-These commands were run on 2026-10-07 and 2026-10-09; results are in the [Checkpoint 1](docs/evidence/2026-10-07-checkpoint-1.md) and [Checkpoint 2](docs/evidence/2026-10-09-checkpoint-2.md) evidence.
+These commands were run on 2026-10-07 and 2026-10-09; results are in the [Checkpoint 1](docs/evidence/2026-10-07-checkpoint-1.md), [Checkpoint 2](docs/evidence/2026-10-09-checkpoint-2.md) and [Checkpoint 3](docs/evidence/2026-10-09-checkpoint-3.md) evidence.
 
 **Prerequisites:** JDK 21 (checked with 21.0.12; point `JAVA_HOME` at it if your default JDK differs) and a running Docker daemon. Maven is not required: use the included `./mvnw` wrapper.
 
 ```bash
-# 1. Start the local PostgreSQL database (published on 127.0.0.1:5433 only)
-docker compose up -d db
+# 1. Start PostgreSQL (127.0.0.1:5433) and the printer simulator (127.0.0.1:8090)
+docker compose up -d --build db simulator
 
-# 2. From backend/, run the unit tests (Surefire) and the PostgreSQL
-#    integration tests (*IT, Failsafe + Testcontainers)
-cd backend
-./mvnw verify
+# 2. Run each test suite from its own directory
+(cd simulator && ./mvnw verify)   # simulator unit and HTTP tests
+(cd backend && ./mvnw verify)     # backend unit tests (Surefire) and integration tests
+                                  # (*IT, Failsafe; PostgreSQL and the simulator run as containers)
 
 # 3. Start the API on http://127.0.0.1:8080 (Ctrl+C to stop)
+cd backend
 ./mvnw spring-boot:run
 
 # 3b. Or start it with the demo-only simulated payment, needed to
@@ -66,7 +67,7 @@ cd backend
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=demo
 ```
 
-The integration tests start their own disposable PostgreSQL container, so step 2 does not need step 1. Stop the local database with `docker compose stop`; its data stays in the `one3d-db` volume.
+The integration tests start their own PostgreSQL and simulator containers (the simulator image is built from `simulator/Dockerfile` on first use), so step 2 does not need step 1. A background worker in the backend delivers start commands to the simulator and polls running prints once per second. Stop the local services with `docker compose stop`; their data stays in the `one3d-db` and `one3d-simulator` volumes. The same suites run in GitHub Actions on every pull request.
 
 | Method and path | Purpose |
 |---|---|
@@ -74,20 +75,21 @@ The integration tests start their own disposable PostgreSQL container, so step 2
 | `POST /api/orders` | Place a one-line order: `{"productConfigurationId": "…", "quantity": 1}` returns 201 and a `Location` header. `quantity` may be omitted or null (it defaults to 1); any other value, including a fractional number such as `1.5`, returns 400 |
 | `GET /api/orders/{id}` | Read an order and its catalog snapshot |
 
-Operator production endpoints (Checkpoint 2). `/api/ops` is a grouping, not access control:
+Operator production endpoints (Checkpoints 2–3). `/api/ops` is a grouping, not access control:
 
 | Method and path | Purpose |
 |---|---|
 | `POST /api/demo/orders/{id}/simulate-payment` | **Demo profile only.** Confirm an order without payment; the order records `confirmationSource: DEMO_SIMULATED` |
 | `POST /api/ops/orders/{id}/release` | Create the order's production job (order must be `CONFIRMED`) |
-| `POST /api/ops/jobs/{id}/attempts` | Start the next attempt: `{"printerId": "…"}`. Needs an idle printer with a cleared bed. At most 3 attempts per job, counting print failures and QC failures; a 4th returns 409 `ATTEMPT_LIMIT_REACHED` |
-| `POST /api/ops/attempts/{id}/simulate-completion` / `simulate-failure` | Report the simulated printer's outcome; failure takes `{"reason": "…"}` |
+| `POST /api/ops/jobs/{id}/attempts` | Record the start of the next attempt: `{"printerId": "…"}`. The attempt is `START_INTENT` until the worker has delivered it and the simulator confirms (`RUNNING`). A lost reply makes it `RECONCILIATION_REQUIRED`; it keeps the printer until the simulator's journal answers. Needs a free printer with a cleared bed. At most 3 attempts per job, counting print failures and QC failures; starts the printer refused do not count; a 4th returns 409 `ATTEMPT_LIMIT_REACHED` |
 | `POST /api/ops/attempts/{id}/qc` | Whole-part inspection: `{"result": "PASSED" or "FAILED", "notes": "…"}` |
-| `POST /api/ops/printers/{id}/clear-bed` | Operator confirms the bed is empty; nothing clears it automatically |
+| `POST /api/ops/printers/{id}/clear-bed` | Operator confirms the print was removed: `{"attemptId": "…"}`, which must be the printer's `bedCycleAttemptId`. Nothing clears the bed automatically; a clearance for an earlier print returns 409 `STALE_CLEARANCE` |
+| `POST /api/ops/attempts/{id}/reconcile` | Retry delivery that ran out of automatic tries (it re-checks the same command; it never starts a new attempt) |
+| `GET /api/ops/work?status=EXHAUSTED` | Delivery work that needs an operator |
 | `POST /api/ops/orders/{id}/ready-for-handoff` | Only after the job's part passed QC |
 | `GET /api/ops/jobs/{id}`, `GET /api/ops/printers` | Job with all attempts; printer ownership and bed state |
 
-The seeded printer `0d3d0000-0000-4000-8000-000000000101` is simulated; no real printer is controlled. An invalid step returns 409 with a code such as `BED_NOT_CLEAR` or `JOB_NOT_ACCEPTED`.
+The seeded printer `0d3d0000-0000-4000-8000-000000000101` is simulated by the separate `simulator/` process; no real printer is controlled. Its results (completion or failure) come from the simulator, not from this API. For local development the simulator has dev controls on 127.0.0.1:8090: `POST /dev/printers/{id}/complete`, `POST /dev/printers/{id}/fail` with `{"reason": "…"}`, and `POST /dev/printers/{id}/faults` with `{"dropNextStartAck": true}`. An invalid step returns 409 with a code such as `BED_NOT_CLEAR`, `PRINTER_BUSY` or `JOB_NOT_ACCEPTED`. Two operators acting at once get exactly one success and a 409.
 
 ```bash
 curl -s -X POST http://127.0.0.1:8080/api/orders \

@@ -1,0 +1,7 @@
+[ERROR] Tests run: 10, Failures: 5, Errors: 0, Skipped: 0, Time elapsed: 7.055 s <<< FAILURE! -- in store.one3d.production.ConcurrencyIT
+[ERROR]   ConcurrencyIT.twoSimultaneousStartsOnOnePrinterGiveExactlyOneAttempt:67 
+[ERROR]   ConcurrencyIT.twoSimultaneousStartsOnOnePrinterGiveExactlyOneAttempt:67 
+[ERROR]   ConcurrencyIT.twoSimultaneousStartsOnOnePrinterGiveExactlyOneAttempt:67 
+[ERROR]   ConcurrencyIT.twoSimultaneousStartsOnOnePrinterGiveExactlyOneAttempt:67 
+[ERROR]   ConcurrencyIT.twoSimultaneousStartsOnOnePrinterGiveExactlyOneAttempt:67 
+[INFO] BUILD FAILURE

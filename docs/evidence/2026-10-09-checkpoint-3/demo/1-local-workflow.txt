@@ -1,0 +1,38 @@
+
+## 1. Start: the request records the intent; the worker delivers it within ~1 s
+{"status":"PRINTING","attempt":"START_INTENT"}
+after 2 s: {"status":"PRINTING","attempts":[{"n":1,"status":"RUNNING"}]}
+simulator: {"runningAttemptId":"c9196176-da64-4c3a-8adf-64491b7649ef","bedState":"OCCUPIED"}
+
+## 2. Simulator restart while printing (docker compose restart simulator)
+after restart, simulator journal: {"runningAttemptId":"c9196176-da64-4c3a-8adf-64491b7649ef","bedState":"OCCUPIED"}
+backend: {"status":"PRINTING","attempts":[{"n":1,"status":"RUNNING"}]}
+
+## 3. Printer finishes (simulator dev control); the observer records it; bed stays occupied
+backend: {"status":"AWAITING_QC","attempts":[{"n":1,"status":"COMPLETED"}]}
+printer: {"bedState":"OCCUPIED","bedCycleAttemptId":"c9196176-da64-4c3a-8adf-64491b7649ef","currentAttemptId":null}
+
+## 4. QC passed; bed cleared by naming the print on it
+{"status":"ACCEPTED"}
+{"bedState":"CLEAR","bedCycleAttemptId":null}
+
+## 5. Lost acknowledgement: the simulator starts the print but the reply is dropped
+attempt status: START_INTENT
+attempt status: RECONCILIATION_REQUIRED
+  another job on the same printer meanwhile: {"status":409,"code":"PRINTER_BUSY"}
+attempt status: RUNNING
+simulator journal for that command: {"outcome":"STARTED","phase":"RUNNING"}
+attempts of job 2: {"status":"PRINTING","attempts":[{"n":1,"status":"RUNNING"}]}
+
+## 6. A delayed clearance for an earlier print cannot clear the current one
+job 2: {"status":"RELEASED","attempts":[{"n":1,"status":"FAILED"}]}
+clear naming print 1 (stale): {"status":409,"code":"STALE_CLEARANCE"}
+clear naming print 2:         {"bedState":"CLEAR"}
+
+## 7. Two operators start different jobs on the same printer at the same moment
+job 5: HTTP 201
+job 4: HTTP 409
+active attempts on the printer: 1
+
+## 8. Clean up: finish the running print and clear the bed
+{"bedState":"CLEAR"}

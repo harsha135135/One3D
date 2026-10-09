@@ -1,0 +1,5 @@
+[ERROR] Tests run: 14, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 7.648 s <<< FAILURE! -- in store.one3d.production.ProductionTransitionsIT
+[ERROR] Tests run: 5, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.293 s <<< FAILURE! -- in store.one3d.production.ProductionWorkflowIT
+[ERROR]   ProductionTransitionsIT.anOrderIsNotReadyForHandoffBeforeItsJobIsAccepted:187->expectConflict:227 Status expected:<409> but was:<200>
+[ERROR]   ProductionWorkflowIT.aFailedQcBlocksHandoffUntilAReplacementPasses:178 Status expected:<409> but was:<200>
+[INFO] BUILD SUCCESS
