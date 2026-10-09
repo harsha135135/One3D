@@ -1,5 +1,5 @@
 # Checks every pull request and every push to main. A PR is merged only after
-# both jobs pass. Image builds and deployment are added in Checkpoint 7.
+# all jobs pass. Image builds and deployment are added in Checkpoint 7.
 name: CI
 
 on:
@@ -55,3 +55,30 @@ jobs:
             backend/target/surefire-reports/
             backend/target/failsafe-reports/
           retention-days: 14
+
+  frontend:
+    name: Frontend checks (lint, build, types, browser smoke tests)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install exact dependencies (package-lock.json)
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      # The build also generates next-env.d.ts, which the type check needs.
+      - name: Build
+        run: npm run build
+      - name: Type check
+        run: npm run typecheck
+      - name: Browser smoke tests (API mocked; desktop and 390 px)
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e

@@ -21,6 +21,6 @@ export function label(status: string | null): string {
   if (!status) {
     return "—";
   }
-  const words = status.toLowerCase().replaceAll("_", " ");
+  const words = status.toLowerCase().replaceAll("_", " ").replace(/\bqc\b/, "QC");
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
