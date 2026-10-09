@@ -14,6 +14,8 @@ Advance through working checkpoints rather than a fixed twelve-week promise. A c
 
 Each checkpoint leaves a runnable application, focused changes, relevant tests and an evidence entry. Nothing below is completed merely because it appears in the plan.
 
+**Process change, 2026-10-09 (owner instruction):** the assistant implements Checkpoints 3–9 and merges each checkpoint after its checks pass. Harsha's ownership exercises are deferred until V1 is implemented, so checkpoints are recorded as "implemented and tested; owner review deferred", not as passed. Details are in [IMPLEMENTED.md](../IMPLEMENTED.md#process-change-owner-instruction-2026-10-09).
+
 ## 2. First runnable milestone: one order through one simulator
 
 This milestone is smaller than full V1. Run locally with seeded demo identities and clearly simulated payment. Do not expose an unauthenticated prototype publicly.

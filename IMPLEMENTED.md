@@ -2,7 +2,17 @@
 
 Last reviewed: 2026-10-09
 
-**Current state: Checkpoint 1 complete; Harsha signed it off on 2026-10-09.** The catalog order API (commit `0fb442e`) passed its automated checks and a local run/restart demonstration on 2026-10-07. Harsha's quantity-default change (`482dbd6`) passed 29 tests on 2026-10-09. The schema and snapshot explanation in his review was reference-assisted and is to be revisited independently. Checkpoint 2 (release, jobs, attempts, simulated printer, bed clearance, QC, at most 3 attempts per job) is implemented and tested locally (commit `700256d` on `feat/checkpoint-2`). On 2026-10-09, 67 tests passed in the first run, and 69 passed after the attempt limit was added, including on the commit itself. The attempt limit was implemented by an assistant and accepted by Harsha subject to his final review. Its owner review is pending. Checkpoints 3–9 have not started. There is no deployed environment and no accepted V1 release.
+**Current state: Checkpoint 1 complete; Harsha signed it off on 2026-10-09.** The catalog order API (commit `0fb442e`) passed its automated checks and a local run/restart demonstration on 2026-10-07. Harsha's quantity-default change (`482dbd6`) passed 29 tests on 2026-10-09. The schema and snapshot explanation in his review was reference-assisted and is to be revisited independently. Checkpoint 2 (release, jobs, attempts, simulated printer, bed clearance, QC, at most 3 attempts per job) is implemented and tested locally (commit `700256d` on `feat/checkpoint-2`). On 2026-10-09, 67 tests passed in the first run, and 69 passed after the attempt limit was added, including on the commit itself. The attempt limit was implemented by an assistant and accepted by Harsha subject to his final review. Its owner review is pending. A fix merged after Checkpoint 2 rejects fractional quantities (73 tests). Since 2026-10-09 the assistant implements the remaining checkpoints, and owner reviews are deferred until V1 is complete; see "Process change" below. Checkpoints 3–9 have not started. There is no deployed environment and no accepted V1 release.
+
+## Process change (owner instruction, 2026-10-09)
+
+After Checkpoint 2, Harsha asked the assistant to implement the rest of V1 (Checkpoints 3–9) by following `ARCHITECTURE.md`, `docs/v1-scope.md` and `docs/roadmap.md`. He will study the repository after V1 is implemented, and does not want per-checkpoint reviews or exercises until then. The assistant implements each checkpoint, verifies it, records evidence, and merges its own PR once the checks pass.
+
+Consequences, under the "latest owner instruction" rule in `AGENTS.md`:
+- Each checkpoint from 2 onwards is recorded as **"implemented and tested; owner review deferred"**, never as passed. The roadmap defines "passed" to include Harsha's ownership exercise.
+- Evidence records state that the work was assistant-implemented. Git authorship and the no-attribution rule are unchanged.
+- V1 acceptance, Harsha's signoff, any release tag and any résumé claim remain his decisions. The final status before his review is **"implementation ready; personal review and signoff pending"**.
+- External steps still need Harsha: AWS login, spend approval, Razorpay test keys and the `demo.one3d.store` DNS record.
 
 The tables below are a progress record, not a feature request list. [V1 scope](docs/v1-scope.md) is authoritative. Update a row only when its evidence exists.
 
@@ -24,7 +34,8 @@ A fact in one column does not establish the others. “Pending” means no verif
 | Checkpoint | Implemented | Tested | Evidence | Owner review |
 |---|---|---|---|---|
 | 1 — API, database and catalog order | Yes, `0fb442e`; quantity default `482dbd6` (owner's change) on `feat/checkpoint-1` | 2026-10-07: `./mvnw clean verify`, 27 tests passed (3 unit, 24 PostgreSQL integration); local restart demo. 2026-10-09: `./mvnw clean verify` on `482dbd6`, 29 passed (3 unit, 26 integration) | [CP1 evidence](docs/evidence/2026-10-07-checkpoint-1.md) | **Signed off 2026-10-09.** Change and runtime trace independent; schema and snapshot explanation reference-assisted ([addendum](docs/evidence/2026-10-07-checkpoint-1.md#owner-review-addendum-2026-10-09)) |
-| 2 — Job, attempt, bed and QC | Yes, `700256d` on `feat/checkpoint-2`. Attempt limit (`MAX_ATTEMPTS = 3`) implemented by an assistant | 2026-10-09: first run 67 passed (14 unit, 53 integration); after the attempt limit 69 passed (15 unit, 54 integration), also on `700256d`; three negative controls; local demo with the `demo` profile (before the limit) | [CP2 evidence](docs/evidence/2026-10-09-checkpoint-2.md) | Pending |
+| 2 — Job, attempt, bed and QC | Yes, `700256d` on `feat/checkpoint-2`. Attempt limit (`MAX_ATTEMPTS = 3`) implemented by an assistant | 2026-10-09: first run 67 passed (14 unit, 53 integration); after the attempt limit 69 passed (15 unit, 54 integration), also on `700256d`; three negative controls; local demo with the `demo` profile (before the limit) | [CP2 evidence](docs/evidence/2026-10-09-checkpoint-2.md) | Pending; deferred by owner until V1 is complete (2026-10-09) |
+| Fix — integer quantity | Yes, `b8e19cc`: fractional quantities (1.5, 1.0, 1e0) return 400 instead of being truncated to 1. Implemented by the assistant | 2026-10-09: `./mvnw clean verify`, 73 passed (15 unit, 58 integration); negative control | [fix evidence](docs/evidence/2026-10-09-integer-quantity-fix.md) | Deferred by owner until V1 is complete |
 | 3–9 | Not started | — | — | — |
 
 ## Required V1 application work
