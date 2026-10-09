@@ -1,0 +1,25 @@
+# Local development database for Checkpoint 1. The application itself runs
+# on the host (see README). Checkpoint 7 adds the application to this file.
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: one3d
+      POSTGRES_USER: one3d
+      # Local development only; matches the default in application.yaml.
+      POSTGRES_PASSWORD: one3d-local-dev
+    ports:
+      # Published on the loopback interface only. The short form "5433:5432"
+      # would listen on every host interface. 5433 avoids clashing with a
+      # PostgreSQL server already installed on the host.
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - one3d-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U one3d -d one3d"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  one3d-db:

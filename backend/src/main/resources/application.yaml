@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: one3d-backend
+  datasource:
+    # Local development defaults match compose.yaml. Override with environment
+    # variables outside local development; never commit real credentials.
+    url: ${ONE3D_DB_URL:jdbc:postgresql://127.0.0.1:5433/one3d}
+    username: ${ONE3D_DB_USERNAME:one3d}
+    password: ${ONE3D_DB_PASSWORD:one3d-local-dev}
+  jpa:
+    # Flyway owns the schema; Hibernate only checks that entities match it.
+    hibernate:
+      ddl-auto: validate
+    # Database access happens inside service transactions, not while
+    # rendering HTTP responses.
+    open-in-view: false
+
+server:
+  # Checkpoint 1 has no authentication, so the API listens on the loopback
+  # interface only and cannot be reached from other machines. Change this
+  # deliberately when identity (Checkpoint 4) and the proxy (Checkpoint 7)
+  # exist.
+  address: 127.0.0.1
+  port: 8080

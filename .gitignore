@@ -1,0 +1,13 @@
+# OS and editor files
+.DS_Store
+.idea/
+*.iml
+.vscode/
+
+# Build output
+target/
+
+# Local secrets and environment overrides
+.env
+.env.*
+!.env.example

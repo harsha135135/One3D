@@ -1,0 +1,5 @@
+                  id                  |      status      |          created_at           |       product_name        | unit_price_minor | currency | recipe_revision_number | quantity 
+--------------------------------------+------------------+-------------------------------+---------------------------+------------------+----------+------------------------+----------
+ 4af6c30c-5288-446a-89b5-2bbcf1bd8702 | AWAITING_PAYMENT | 2026-10-07 08:06:54.575393+00 | Hex Desk Organizer (demo) |            49900 | INR      |                      1 |        1
+(1 row)
+

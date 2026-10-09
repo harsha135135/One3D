@@ -1,443 +1,228 @@
-# One3D / PrintFlow — Architecture
+# One3D — planned V1 architecture
 
-Status: draft · Last reviewed: 2026-09-28
+Status: **planned, not implemented** · Decision date: 2026-10-07
 
-![System architecture](architecture.svg)
+V1 is a bounded Java backend portfolio project for a fresher. It demonstrates a complete workflow, sound engineering and the ability to explain and operate the result. It is not the first release of the complete print-farm business.
 
-## 1. Purpose and scope
+The authoritative feature limits and completion gates are in [V1 scope](docs/v1-scope.md). This document describes its implementation structure. [The target architecture](docs/target-architecture.md) preserves the later business direction without adding V1 requirements. [IMPLEMENTED.md](IMPLEMENTED.md) records evidence; a design described here does not count as implemented.
 
-PrintFlow is the order-to-shipment system behind **One3D**, a custom figurine and small-batch 3D printing service. It also runs **PrintBack**, a documented take-back and material-ledger program. **OneCreations** is the public portfolio site, deployed separately.
+The previous Lambda/DynamoDB architecture and diagram are [archived](docs/history/architecture-2026-09-30.md). Their services, deployment phases and cost estimates are superseded.
 
-The system is built as a small, well-instrumented manufacturing application with explicit physical safety boundaries. The engineering priorities are:
+![Planned V1 architecture; no components are implemented yet](architecture.svg)
 
-1. durable job ownership and recoverable edge execution;
-2. immutable design revisions and approved manufacturing artifacts;
-3. measured production cost and capacity (machine, sculpting and finishing time);
-4. honest, reconcilable material and credit records.
+## 1. The bounded workflow
 
-Adding more cloud services is not a goal. Each service needs a reason to be there.
+A customer orders one configured catalog product, or submits one STL for manual review and a quote. The operator releases manufacturing, assigns one simulated printer, handles success or failure, checks the resulting part and marks the order ready for handoff.
 
-## 2. Architectural principles
+- One seeded catalog product/configuration; one order line, quantity one.
+- One part produced by one plate job; whole-part QC pass/fail.
+- Custom requests contain one STL per submission revision, up to 20 MB.
+- A new upload or changed requirements creates a new revision.
+- Manual review, quote, production release and assignment.
+- Razorpay test mode only; no live customer money.
+- One independently restartable printer simulator; no physical printer control.
+- A failed or rejected part can lead to an explicitly authorized replacement attempt.
+- Manual readiness for handoff and handoff confirmation. Multi-part assembly, partial quantities and complex shipping are V2.
 
-- **Physical side effects are never "exactly once" by infrastructure.** SQS, MQTT, Lambda retries and Step Functions cannot guarantee that a printer starts exactly once. The command journal and reconciliation handle this.
-- **Never automatically reassign an attempt that may already have started.** When the system cannot tell whether a print started, the state is `RECONCILIATION_REQUIRED` and a person resolves it.
-- **Commands are not events.** `StartPrintRequested` is not `PrintStarted`.
-- **Business commands, not "set status".** Transitions go through a domain function that checks the current state, the actor's permissions and the expected revision.
-- **Immutable references.** Production uses exact S3 object versions and SHA-256 checksums. It never uses "the latest file at this key".
-- **Humans own artistic and physical-safety judgement.** Automation covers file checks and scheduling. People own likeness, anatomy, support placement, bed-clear confirmation and QC release.
-- **Cloud connectivity is not an emergency stop.** Local firmware and local safety controls own the machine.
-- **Replaceable vendors.** AI, mesh-prep tools, payment and printers all sit behind small adapters, and neutral exports (STL/OBJ/3MF) are kept.
+There is no basket, arbitrary workflow editor, automatic slicer, stock ledger, multi-printer scheduler or recycling-credit platform in V1. Scope expansion waits until the V1 completion checkpoint.
 
-## 3. Phases
+## 2. Stack and runtime boundaries
 
-| Phase | Scope |
-|---|---|
-| **MVP / first paid orders** | Static OneCreations site. One3D customer and operator web apps. HTTP API Gateway → Lambda modules. Private S3, DynamoDB, Cognito, payment provider, email. SQS + DLQ for async validation. One Step Functions Standard workflow: *asset validation → preparation → operator review*. Quoting, slicing, assignment and bed-clear confirmation are **manual**. One repo, a few deployment units, no microservice fleet. |
-| **First connected printers** | Bridge service on a local mini PC. AWS IoT Core with one X.509 certificate per bridge (mTLS, outbound only). Durable command table plus edge SQLite journal. Short-lived S3 URLs for approved artifacts. Immutable print attempts, reconciliation, metrics and alerts. The Bambu X1C starts with **monitoring and operator-confirmed dispatch** until the firmware integration path is verified. |
-| **Later** | Containerised mesh/slicing workers: local first, then ECS/Fargate or AWS Batch when demand is measured. EventBridge once several consumers need the same event. Full material inventory, credit ledger, partner receipts and reconciliation. Scheduling optimisation, multiple farms and analytics, but only after there is operational data to justify them. |
-
-Test and production live in separate AWS accounts if manageable. Otherwise they use separate stacks and roles, and development roles cannot read production data.
-
-## 4. Components
-
-### 4.1 Clients
-
-| Client | Purpose | Auth |
+| Concern | Planned choice | Responsibility |
 |---|---|---|
-| OneCreations site | Public portfolio and editorial stories | None (public) |
-| One3D customer web | Uploads, orders, approvals, payments, credits, provenance | Cognito, or a restricted guest upload session |
-| Operator console | Quotes, plan approval, slicing hand-off, assignment, QC, finishing, material intake | Cognito with MFA and explicit roles. A hidden URL is not access control. |
+| Customer and operator UI | Next.js, React, TypeScript | One frontend with customer pages and `/ops` |
+| Backend | Java 21, Spring Boot, Spring MVC | APIs, permissions and business rules |
+| Persistence | PostgreSQL, Spring Data JPA/Hibernate | Relational records/transactions; explicit SQL where useful |
+| Schema changes | Flyway | Reviewed, versioned migrations |
+| Authentication | Spring Security OIDC with Cognito user pool | CUSTOMER and OPERATOR permissions enforced by backend |
+| Files | Private S3 bucket | Direct upload and exact approved object references |
+| Payments | Razorpay test mode | Checkout, verified callbacks and reconciliation exercises |
+| Background work | PostgreSQL work/outbox rows and small Spring worker | Durable verification, dispatch and bounded retries |
+| Simulator | Small Java process with SQLite journal | One virtual printer independent of backend restarts |
+| Deployment | Docker Compose on small AWS EC2 instance | One understandable demo environment |
+| Reverse proxy | Nginx | HTTPS and same-origin frontend/API routing |
+| CI/CD | GitHub Actions | Tests, image build and controlled deployment |
+| Infrastructure | Bounded Terraform configuration | Reproducible demo infrastructure and permissions |
+| Monitoring | Actuator/Micrometer, Prometheus, Grafana | Restricted metrics, useful dashboard, failure investigation |
 
-### 4.2 Cloud (AWS)
+Choose compatible maintained versions during implementation and pin dependencies through build tooling and lockfiles. This plan does not establish that dependencies are installed or verified.
 
-| Component | Responsibility |
-|---|---|
-| **Cognito** | Customer and operator identity, JWTs, operator MFA. |
-| **HTTP API Gateway** | JWT authorisation and routing. Mutating endpoints require an idempotency key. |
-| **Lambda application modules** | Orders, design revisions, quotes, payments, production release, assignment, reconciliation, QC, finishing, material intake and the credit ledger. Stateless. All state lives in DynamoDB/S3. |
-| **DynamoDB** | Operational state, a few tables split by responsibility. Conditional transactions, idempotency records and the transactional outbox. |
-| **S3 (private, versioned)** | Customer photos, meshes, 3MF files and slicer projects. Objects move from `quarantine/` to `approved/` and are referenced by version and checksum. |
-| **SQS + DLQ** | Asynchronous compute backlog: validation, preparation, notifications. Printers do **not** consume this queue. |
-| **Step Functions (Standard)** | Longer workflows with human approval, starting with validation → preparation → operator review. Payloads carry S3 references, never the models themselves. |
-| **Outbox publisher** | DynamoDB Streams triggers publishing. A sweeper queries pending outbox items as a recovery path. Consumers deduplicate. |
-| **AWS IoT Core** | MQTT over mTLS to bridges. Notifications point to durable commands. The credential provider exchanges a bridge certificate for scoped, short-lived AWS credentials if direct S3/SQS access is ever needed. |
-| **Secrets Manager / KMS** | Vendor keys and encryption at rest. |
-| **Observability** | Structured JSON logs, EMF metrics, OpenTelemetry/ADOT → X-Ray, and alarms. |
+The backend is one deployable application. The simulator is separate to model execution that survives a backend restart, not to introduce a real edge platform. S3, Cognito and test payments have narrow client boundaries; the application does not communicate with its own feature packages over a network.
 
-### 4.3 Edge (print farm)
+RabbitMQ, Kafka, Kubernetes, Jenkins and Ansible are optional, independently runnable labs. They are not V1 runtime dependencies or release gates. Do not maintain two CI systems for the same exercise or add a broker merely to increase the technology count.
 
-| Component | Responsibility |
-|---|---|
-| **Bridge service** (existing mini PC) | Holds the durable SQLite command journal, checks preconditions, records `START_INTENT`, sends machine I/O through adapters, uploads events in order, and reconciles after a restart. Makes outbound connections only. |
-| **Printer adapters** | Each adapter declares what it can do (`monitor`, `upload`, `start`, `pause`, `jobId`). The system never assumes a generic `startPrint()`. |
-| **Printers** | Existing FDM farm (no AMS) and a Bambu X1C (monitoring plus operator-confirmed start at first). |
-| **Printer simulator** | Deterministic failure injection for tests and demos. Its output is always labelled as simulated. |
-| **Local slicing / mesh worker** | Controlled, versioned slicer profiles. Machine instructions are always generated from those profiles. Customer-supplied G-code is never run. |
-| **Operator station** | Bed-clear confirmation, part QC, finishing, final QC. |
-| **Material intake station** | Verified scale, tare containers, labelled bins and evidence capture. |
+## 3. Planned repository structure
 
-### 4.4 OneCreations boundary
+The repository currently contains plans. This is the intended shape, not an inventory of implemented code:
 
-OneCreations is deployed separately: CloudFront, a public asset bucket and a small content layer. It never queries the One3D production database.
-
-Publishing works like this: a selected One3D result becomes a *publication candidate*. After customer consent and editorial approval, sanitised derivative images and story text are copied into the OneCreations public bucket or CMS.
-
-- **Shared between the two sites:** UI primitives, schemas, build tooling and approved derivative assets.
-- **Never shared:** customer photos, raw models, addresses, credits, payment records, authentication and IAM/deploy permissions.
-
-## 5. Domain model
-
-One status field with 20+ stages would mix several independent lifecycles, so the model keeps them separate:
-
-| Entity | Meaning |
-|---|---|
-| Order | Commercial agreement, customer, payment, promised delivery |
-| Order item | Product specification and quantity |
-| Design revision | Immutable geometry/concept version and its approvals |
-| Manufacturing plan | Approved revision, parts, quantities, material, process |
-| Part | A required physical component |
-| Build-plate job | One planned build containing one or more parts |
-| Print attempt | One actual execution of a job |
-| QC inspection | Evidence, measurements, accept/reject |
-| Finishing task | Assembly, sanding, painting, packing |
-| Shipment | Fulfilment and tracking |
-| Material batch | Physical input/output inventory |
-| Credit entry | Immutable financial or loyalty movement with a reason |
-
-> Example: an order with 8 parts might need 3 build plates, one of which fails once. That is **1 order, 3 jobs and 4 attempts**. Metrics and costs always state which of these they count.
-
-### 5.1 Lifecycles
-
-```
-Order:      DRAFT → DESIGN_IN_PROGRESS → AWAITING_APPROVAL → APPROVED → PRODUCTION
-            → FINISHING → READY_TO_SHIP → SHIPPED → DELIVERED   (+ ON_HOLD, CANCELLED)
-Payment:    PENDING → PARTIALLY_PAID → PAID → REFUND_PENDING → REFUNDED
-Design:     WORKING → REVIEW_REQUIRED → APPROVED → SUPERSEDED
-Attempt:    PLANNED → RESERVED → READY → START_INTENT → RUNNING → PRINT_COMPLETED → QC_PASSED
-            (+ FAILED_CONFIRMED, CANCELLED_BEFORE_START, RECONCILIATION_REQUIRED)
-Printer connectivity: ONLINE / STALE / OFFLINE
-Printer physical:     IDLE / RUNNING / PAUSED / ERROR / UNKNOWN
+```text
+backend/
+  pom.xml
+  src/main/java/.../one3d/
+    identity/ catalog/ requests/ quotes/ orders/
+    payments/ production/ files/ background/
+    common/                 small shared errors/configuration only
+  src/main/resources/db/migration/
+  src/test/java/...
+frontend/
+  src/app/                  customer routes and /ops
+  src/components/
+  src/lib/                  typed API access
+simulator/
+  pom.xml
+  src/main/java/...
+infra/
+  terraform/
+  nginx/
+  monitoring/
+.github/workflows/
+compose.yaml
+docs/
+  decisions/ runbooks/ evidence/
+labs/                       optional exercises
 ```
 
-Rules:
-- `OFFLINE` describes connectivity. It does not prove that a print failed.
-- A customer revision creates a **new** design revision. It never overwrites geometry that an active print is using.
-- A reprint creates a **new** attempt with a reason and a cost attribution. The failed attempt's material and time stay on record.
-- Parts are inspected before assembly, and there is a final QC after finishing so that painting and assembly defects are caught.
+Within a feature, use controller, request/response DTO, application service, domain/entity and repository classes as needed. Do not create every possible layer for every trivial operation. Add subpackages when actual size warrants them.
 
-## 6. Physical dispatch protocol
+### Code rules
 
-The most important invariant: **never automatically reassign an attempt that may already have started.**
+- Controllers map HTTP and validate input. Application services own use cases, permission checks and transaction boundaries.
+- Domain methods enforce transitions. Do not expose generic `setStatus` endpoints.
+- Return DTOs, not JPA entities or accidentally serialized relationships.
+- Features own their writes behind small service interfaces. Avoid reaching through unrelated repositories.
+- Use Bean Validation for request shape, domain checks for rules and consistent exception-to-HTTP responses.
+- Prefer constructor injection, meaningful names and small methods. Avoid a framework of generic base services on top of Spring.
+- Use pagination and deliberate queries; understand generated SQL and avoid loading complete object graphs.
+- Keep configuration outside code and credentials outside Git/images. Document safe development defaults.
+- Store money as integer minor units with currency; use explicit units for size and duration and consistent UTC timestamps.
+- Use interfaces for actual boundaries such as storage/payment/simulator clients. Not every class needs an interface.
+- Write short decision records for real tradeoffs. Do not implement speculative V2 abstractions.
 
-```
-Operator/scheduler         Cloud (DynamoDB)                 Bridge (SQLite)            Printer
-      │ select printer            │                                │                       │
-      ├──────────────────────────►│ TX: reserve printer (cond.)    │                       │
-      │                           │     + bump job version         │                       │
-      │                           │     + create immutable attempt │                       │
-      │                           │     + write command + outbox   │                       │
-      │                           ├── IoT notify(commandId) ──────►│ persist command       │
-      │                           │                                │ check: idle, bed clear│
-      │                           │                                │  material/profile,    │
-      │                           │                                │  generation current   │
-      │                           │                                │ record START_INTENT   │
-      │                           │                                ├── supported start ───►│
-      │                           │                                │ record result + jobId │
-      │                           │◄── ordered events (epoch, seq) ┤                       │
-```
+## 4. Data model and invariants
 
-The command carries: `commandId`, `attemptId`, `printerId`, assignment `generation`, approved artifact version and checksum, profile version, and preconditions.
-
-- Receiving the same `commandId` again returns the stored result. It never starts the printer a second time.
-- If the bridge crashes between `START_INTENT` and a recorded result, the outcome is **uncertain**. If the adapter cannot prove whether printing started, the attempt goes to `RECONCILIATION_REQUIRED` and someone inspects the printer.
-- **Leases** control who may *prepare* an unstarted assignment. When a lease expires it never releases a print that may be running.
-- **Fencing generations** let the edge reject stale commands. They cannot revoke a command already delivered to a disconnected machine.
-- **Offline policy (MVP):** a known active print continues under firmware control. The bridge buffers telemetry and blocks new starts, then reconciles when the connection returns.
-- After a bridge restart, it reconciles its journal against the actual machine state before it accepts new work.
-
-## 7. Failure handling
-
-| Failure | Recovery |
-|---|---|
-| Duplicate queue/MQTT delivery | Return the previous command result |
-| AI provider timeout | Query the existing vendor job before paying for another request |
-| Repeated upload event | Revalidate the same immutable asset version (idempotent) |
-| Slicer transient error | Bounded retries, then DLQ and human review |
-| Invalid geometry | Human repair. Retrying unchanged input is pointless. |
-| Printer unreachable before a proven start | Reconcile. Reassign only after proving the print did not start. |
-| Printer unreachable during a print | Mark `STALE`/`UNKNOWN` and keep ownership |
-| Confirmed failed print | Record the material and time used, inspect the machine, approve a new attempt |
-| QC failure | Keep the failed inspection and create rework or a reprint with its cause |
-| Duplicated payment webhook | Apply each provider event once |
-| Repeated credit issuance | The same transaction key returns the same ledger result |
-
-## 8. Data design
-
-### 8.1 DynamoDB access patterns
-
-| Access pattern | Key / index |
-|---|---|
-| Order with items and revisions | `PK=ORDER#id`, `SK=META / ITEM#id / REV#id` |
-| Customer's recent orders | GSI `CUSTOMER#id`, sort `createdAt#orderId` |
-| Job and its attempts | `PK=JOB#id`, `SK=META / ATTEMPT#id / EVENT#time#id` |
-| Ready work at a farm | Sparse GSI `FARM#id#READY`, sort `priority#dueAt#jobId` |
-| Printer current ownership | `PK=PRINTER#id`, `SK=STATE` (conditional writes) |
-| Printer history | `PK=PRINTER#id`, `SK=ATTEMPT#time#id` |
-| Pending commands for a bridge | `PK=BRIDGE#id`, `SK=COMMAND#time#id` |
-| Credit balance and history | `PK=ACCOUNT#id`, `SK=BALANCE / ENTRY#time#id / HOLD#id` |
-| Material batch and movements | `PK=BATCH#id`, `SK=META / MOVE#time#id / EVIDENCE#id` |
-| Unpublished events | Pending-outbox GSI (bucketed later if traffic warrants) |
-| Duplicate request check | `PK=IDEMPOTENCY#actor#operation#key` |
-
-- GSIs are for listing candidates only. The authoritative record is re-checked inside a conditional transaction before assignment.
-- There is no global `PK=QUEUED` partition, and no scan on every dashboard refresh. A ten-printer farm does not need sharding yet.
-- Money is stored as integer paise, credits as integer credit units and mass as integer grams. Every record keeps its rate-card version.
-
-### 8.2 Transactions
-
-- Reserve printer, bump job version, create attempt and create outbox record.
-- Approve design, write the approval snapshot and create an event.
-- Accept a material batch, create a credit entry, update the balance and create an event.
-- Reserve credit and create an order hold, then settle or release the hold once the payment outcome is verified.
-
-### 8.3 Event envelope and outbox
-
-```
-eventId, eventType, schemaVersion,
-aggregateType, aggregateId, aggregateVersion,
-occurredAt, receivedAt, actorId,
-correlationId, causationId,
-orderId?, jobId?, attemptId?,
-payload
-```
-
-Core events: `AssetValidated`, `DesignApproved`, `QuoteAccepted`, `PaymentCaptured`, `ProductionReleased`, `AttemptReserved`, `PrintStartConfirmed`, `PrintCompleted`, `QCRejected`, `ReprintAuthorized`, `FinishingCompleted`, `ShipmentDispatched`, `MaterialAccepted`, `CreditIssued`, `CreditReserved`, `CreditRedeemed`, `RecyclerReceiptRecorded`.
-
-The state change and its outbox item are written in the same transaction. Streams trigger publishing, and a sweeper covers anything the stream misses (stream retention is only 24 h). A pending item stays until it is delivered or escalated. If publishing succeeds but the "mark delivered" write fails, the event goes out twice, so consumers deduplicate on `eventId`. TTL is only for cleanup. It never authorises a lease, expires spendable credit or enforces a deadline.
-
-Reporting across orders uses S3 exports or analytical summaries. DynamoDB is the operational store, not the long-term accounting database.
-
-## 9. API surface
-
-```
-POST /uploads                              POST /jobs/{id}/assignments
-POST /uploads/{id}/complete                POST /attempts/{id}/reconcile
-POST /orders                               POST /attempts/{id}/qc-inspections
-GET  /orders/{id}                          POST /attempts/{id}/reprint-authorizations
-POST /orders/{id}/design-approvals         POST /finishing-tasks/{id}/complete
-POST /quotes/{id}/accept                   POST /material-intakes
-POST /orders/{id}/production-release       POST /material-intakes/{id}/accept
-POST /payments/provider-webhook            POST /credit-reservations
-GET  /jobs?farmId=&state=&cursor=          POST /credit-adjustments
-GET  /accounts/me/credits                  GET  /objects/{publicToken}/provenance
-```
-
-Mutating endpoints take an idempotency key and, where relevant, an expected revision. The server checks ownership and whether the transition is allowed. It never trusts account or tenant identifiers supplied by the client.
-
-## 10. Security
-
-### 10.1 Upload pipeline
-
-1. Authenticate, or issue a restricted guest upload session.
-2. Allocate a random object key owned by the server, under the right account and order.
-3. Issue a short-lived presigned POST with restrictions. A presigned URL can be reused until it expires and can overwrite an existing key, so it is not a one-use permission.
-4. The browser uploads directly to private S3 `quarantine/`.
-5. The server checks the actual size, content, checksum and ownership.
-6. Process with strict CPU, memory and decompression limits. 3MF is a zip container, so the pipeline guards against archive bombs and path traversal. Extensions and MIME headers are not treated as validation.
-7. Promote to `approved/`. From then on, only that exact version and hash are referenced.
-
-### 10.2 AI vendor isolation
-
-Vendors sit behind `createConcept`, `submitModelJob`, `getStatus` and `downloadResult`. Each call stores the provider, model/version, prompt-template version, input hashes, vendor job ID, spend and approval history.
-
-- Budget caps per order and per customer. Bounded retries and a circuit breaker.
-- After an ambiguous failure, query the existing vendor job before spending again.
-- Vendor callbacks are verified and protected against replay. Downloaded outputs are treated as untrusted uploads.
-- Customer photo consent, minimal retention and the vendor's privacy terms are all recorded.
-- Manual sculpting remains the fallback.
-- **No AI agent may issue machine commands, approve its own work or change the credit ledger.**
-
-### 10.3 Identity and operations
-
-- Each bridge has its own X.509 certificate. There are no long-lived IAM keys or homemade API tokens on edge devices.
-- Deploys use GitHub OIDC with least-privilege roles.
-- Vendor secrets live in Secrets Manager and are rotated.
-- Operator actions are audit-logged, and backups are tested.
-
-## 11. Scheduling
-
-Start with a deterministic, explainable policy:
-
-1. Filter on hard constraints: capability, material, nozzle/profile, build volume, machine health, enough material, and an available operator and bed.
-2. Sort by promised date and priority.
-3. Prefer the eligible printer with the earliest expected completion, including setup and turnover time.
-4. Require operator confirmation at first.
-5. Record why each assignment was made and how accurate its estimate was.
-
-An order can only move to assembly when its last missing part is done. Keeping every printer busy can lengthen lead times by flooding finishing with work, so work in progress and finishing capacity are tracked alongside printer availability.
-
-Accepted orders are limited by whichever resource runs out first, and demand includes failed attempts and rework:
-
-$$
-\text{Monthly accepted orders} \le \min\left(\frac{\text{machine hours}}{\text{machine h/order}},\ \frac{\text{sculpting min}}{\text{sculpting min/order}},\ \frac{\text{finishing min}}{\text{finishing min/order}}\right)
-$$
-
-No scheduling model gets trained until a simple heuristic has a measured baseline.
-
-## 12. Manufacturing workflow integration
-
-The process is chosen per product and recorded in the manufacturing plan:
-
-| Product | Starting route | Main constraint |
+| Boundary | V1 responsibility | Invariant |
 |---|---|---|
-| Stylised bust, chibi, larger simple collectible | Existing FDM farm, single material, controlled finishing | Sanding/painting time |
-| Small realistic face, jewellery, hair, delicate accessories | Outsourced resin sample compared against FDM | Detail, support damage, breakage |
-| Large premium figurine | FDM body/base plus separate detail parts if justified | Assembly, fit, consistency |
-| Repeat creator collectible | Approved master with a repeatable bill of materials and finishing recipe | Per-unit painting labour |
-| Functional part | Qualified material and orientation | Anisotropy, tolerances, environment |
+| Identity | External subject and local permissions | Client-supplied customer IDs cannot grant access |
+| Product / recipe revision | Catalog configuration and approved instructions | Later recipe edits do not change accepted orders |
+| Custom request / submission revision | STL, requirements and review | Approval is tied to one immutable revision |
+| Artifact | Owner, key/version, digest, size and validation state | Reference identifies the bytes actually verified |
+| Quote revision | Manual price, scope, expiry and acceptance | Acceptance freezes one offer |
+| Order / line snapshot | Agreed scope, money and handoff progress | One line, quantity one; no silent substitution |
+| Payment / event receipt | Provider operation and money facts | Duplicate delivery cannot create a second release |
+| Release / plate job | Explicit authorization for one part | Payment alone does not authorize execution |
+| Attempt | One execution of a job | Replacement preserves earlier failures |
+| Reservation / command | Ownership and durable instruction | One active owner; uncertainty retains ownership |
+| Clearance / QC | Operator clearance and whole-part inspection | Idle does not mean clear; completion does not imply acceptance |
+| Audit / pending work | Transition evidence and durable follow-up | No full event sourcing required |
 
-**Mesh pipeline:**
+Use foreign keys and database uniqueness rules. Bounded snapshots can use validated JSON; core relationships belong in ordinary relational records.
 
-```
-original source → reviewed prepared mesh → per-part exports → versioned slicer project → approved production artifact
-```
+### Transaction boundaries
 
-- **Automated checks:** file integrity, units and dimensions, topology, disconnected components, minimum features, thumbnails, connector generation, validated slicer presets.
-- **Human release gate:** likeness, anatomy, hidden surfaces, fragile features, support placement, final orientation.
-- **Golden model suite:** faces, fingers, jewellery, hair, fur, fabric, thin props and keyed joints. Every tool is measured against it.
-- Third-party prep tools such as Audja (public beta, no verified unattended API) are operator tools behind this file boundary. A proprietary project file is never the only manufacturing record.
+1. Accept one exact quote revision and create its order snapshot.
+2. Record a verified payment/event and commercial eligibility.
+3. Release the approved manufacturing scope once.
+4. Reserve printer/job, create attempt and insert command/work record.
+5. Record an observation and its allowed attempt transition.
+6. Record QC and separately authorize replacement when necessary.
 
-Time is logged per stage: intake, concept, revisions, sculpting/repair, slicing and setup, support removal and sanding, assembly, painting, QC, packing and rework. Each stage records both *active human minutes* and *elapsed time*.
+Use optimistic versions for ordinary edits and short locking/conditional-update transactions for contested reservations. Unique constraints protect provider identities and active ownership. Never hold a database transaction open while calling S3, payments or the simulator.
 
-## 13. Material and circularity ledger (PrintBack)
+## 5. Security and files
 
-At first, PrintBack means documented collection through registered recycling partners, plus a clean internal scrap program. There is no in-house processing of household plastic until recovered material has a proven buyer, a qualified process and repeat volume.
+### Identity and authorization
 
-### 13.1 Material states
+Use Spring Security OIDC login with Cognito and server-managed sessions. Cookies are HttpOnly and Secure in deployment; cookie-authenticated mutations have CSRF protection. For the single-backend demo, requiring login again after restart is an acceptable documented simplification.
 
-```
-received → inspected → accepted (dry polymer) → stored → shipped → partner received
-        → processed → qualified output → incorporated in product
-```
+Every endpoint checks role and object ownership. `/ops` is a UI grouping, not access control. Restrict role assignment and use operator MFA for the deployed demo. No Cognito identity pool or browser-held long-lived tokens are required.
 
-A shipment is not recycling. Qualified output sitting in storage has not yet displaced any virgin material. Internal regrind is never counted again as new collection.
+### Immutable direct uploads
 
-Each record keeps gross weight, tare, contamination, moisture correction, accepted weight, polymer confidence, source, scale and operator, transfers, output lots, losses and evidence.
+1. Authenticated customer requests an upload session for their request.
+2. Backend allocates a random quarantine key and short-lived, size-bounded upload authorization.
+3. Browser uploads directly to S3; Spring is not the binary upload path.
+4. Finalization identifies the exact object version and queues verification.
+5. A trusted worker checks ownership, actual size, basic STL structure and full-file SHA-256 while reading that exact version.
+6. Finalized references pin that version and digest, or an exact verified copy in an application-controlled location.
+7. Operator still determines suitability for the requested work.
 
-### 13.2 Acceptance policy (enforced in intake)
+Accept one STL up to 20 MB. Basic bounded checks do not prove mesh safety or manufacturability. Do not execute models or accept customer G-code. Advanced parsing/repair and 200 MB multipart transfer are V2.
 
-| Stream | Initial policy |
-|---|---|
-| Own clean PLA / PETG scrap | Segregated by formulation and source. PETG is kept separate from PLA and from PET. |
-| Customer PLA/PETG prints | Accepted conditionally with provenance. Unknown coatings or fillers are quarantined. |
-| PET bottles, HDPE, PP, film | Partner collection only, against the partner's specification |
-| ABS/ASA, nylon, composites | Excluded from the first internal process |
-| Painted or glued figurines | Assessed for repair or disassembly. Kept separate from clean scrap. |
-| Cured photopolymer resin | Excluded from thermoplastic recycling. Goes to a local compliant waste route. |
-| Unknown mixed plastic, PVC, multilayer, dirty waste, "old toys" | Not accepted automatically and earns no credit |
+Do not trust extensions, browser MIME types or client checksums. Presigned URLs are not one-use permissions; an object key alone is not immutable identity. Private signed downloads require ownership checks. Do not log signed URLs, private contents or tokens. Handle abandoned objects through a documented cleanup policy.
 
-### 13.3 Mass balance and metrics
+### Payment test boundary
 
-All figures use the same dry-mass basis:
+Label the demo and checkout as test mode. Verify the webhook signature over the required raw body; validate amount, currency and provider identities before recording success. Unique provider event IDs and payment IDs address different duplicate cases. A browser success page is not payment evidence.
 
-$$
-\text{opening inventory} + \text{external inputs} = \text{qualified outputs} + \text{residues/losses} + \text{closing inventory}
-$$
+Test replay, invalid signatures and reordered events. Explicit release stays separate from payment. Live onboarding, taxation, deposits and advanced refund policy are V2 business requirements.
 
-Any unexplained balance error is reported, never forced to zero. Virgin additions, recovered polymer and non-polymer additives are tracked separately.
+## 6. Jobs, attempts and simulator protocol
 
-$$
-\text{Acceptance rate} = \frac{\text{accepted}}{\text{received}} \qquad
-\text{Recycling yield} = \frac{\text{qualified recycled output}}{\text{accepted feedstock processed}} \qquad
-\text{Product recycled fraction} = \frac{\text{verified recycled polymer incorporated}}{\text{declared product mass}}
-$$
+Keep lifecycle records separate:
 
-Every figure states its denominator. Estimated virgin displacement is $D = \sum_p R_p \times s_p$, using a documented substitution factor $s_p$. If there is no defensible substitute, $s_p$ is zero or "unknown". Displaced polymer mass is not avoided CO₂.
-
-### 13.4 PrintBack vs RePrint
-
-- **PrintBack:** a pooled stream with documented custody. Credits are based only on verified acceptance.
-- **RePrint:** a paid feasibility assessment followed by a segregated batch. It promises batch identity only when the process can actually preserve it, and discloses minimum input, losses, virgin additions, colour variation and the fallback if it fails.
-
-### 13.5 Claims and regulatory constraints the software must respect
-
-- Print Credits, collection receipts and EPR certificates are different records and are never the same entity. Only registered processors can issue EPR processing certificates, and EPR revenue is excluded from the base financial model. Plastic EPR operations now run on CPCB's Common EPR portal.
-- Public provenance and claims pages show measured quantities, scope, dates, exclusions and evidence status (CCPA 2024 greenwashing guidelines). They never use blanket "eco-friendly", "zero-waste" or "closed-loop" wording.
-- Recycled-content labels follow G.S.R. 237(E) (31 Mar 2026) and IS 14534:2023 where they apply.
-- All demo data is labelled synthetic unless it was actually weighed.
-
-## 14. Observability
-
-- **Logs:** JSON with IDs, state version, error class, duration and cost category. No PII, photo URLs, tokens, presigned URLs or raw vendor payloads.
-- **Business metrics:** paid orders, contribution margin, design minutes, revisions, acquisition cost, refunds.
-- **Production metrics:** queue time, attempt success, first-pass yield, active hours, operator minutes, setup time, rework cost, estimate error.
-- **Reliability metrics:** API latency and errors, stale bridges, outbox age, oldest SQS message age, DLQ depth, stuck approvals, reconciliation count.
-- **Circularity metrics:** accepted and rejected mass, inventory, confirmed external processing, yield, unexplained balance.
-- **Cost metrics:** $ per job, per attempt, per accepted product, and per GB retained.
-
-Order, job and attempt IDs belong in logs and traces, not in metric dimensions. Tracing uses OpenTelemetry/ADOT with X-Ray as the destination. The X-Ray SDK and daemon have been in maintenance mode since 2026-02-25, so new code does not use them. Cloud and edge spans are linked by correlation IDs. A trace is never held open for the days an order takes.
-
-## 15. Platform constraints that shape the design
-
-| Constraint | Consequence |
-|---|---|
-| Lambda on-demand max 15 min | Long slicing and mesh jobs run on workers or containers |
-| SQS visibility max 12 h from first receive | Ack once responsibility is durably handed over. Never hold a message for a 30-hour print. |
-| Step Functions Standard ≤ 1 year; Express ≤ 5 min | Standard for approvals. Idempotent side effects are still required. |
-| Step Functions payload 256 KiB; 25,000 history events | Pass S3 references and checksums. Keep telemetry out of workflow history. |
-| DynamoDB transaction: 100 actions / 4 MB, one action per item; client token lasts 10 min | Application-level idempotency records for payments and manufacturing |
-| DynamoDB Streams retention 24 h | The stream is not the audit log. Pending outbox items plus the sweeper cover recovery. |
-
-## 16. Cost model (illustrative)
-
-Rough estimate at US-East reference rates, as of 2026-09. Recalculate for the India region before deploying. A "job" is one build-plate work item.
-
-| Driver | ≈ $/job |
-|---|---|
-| S3 storage (0.3 GB, 3-month retention) | 0.0207 |
-| Internet egress (0.2 GB) | 0.0180 |
-| Step Functions (40 transitions) | 0.0010 |
-| Logs (1 MB) | 0.0005 |
-| Lambda, API GW, DynamoDB, SQS, EventBridge, S3 requests | ~0.0004 |
-| **Total variable** | **≈ 0.041** |
-
-| Jobs/month | Variable | + $25 operating allowance | Preliminary budget |
-|---|---|---|---|
-| 100 | $4 | $29 | $30–50 |
-| 1,000 | $41 | $66 | $65–100 |
-| 10,000 | $406 | $431 | $430–650 |
-
-Storage and egress dominate, not orchestration. A 100 KB camera snapshot every minute is about 4.3 GB per printer per month, and continuous video would need its own budget. The model excludes AI generation, GPU or cloud slicing, SMS/WhatsApp, heavy traffic, tax, support plans and local hardware and electricity.
-
-## 17. Repository layout
-
-```
-apps/        onecreations/  one3d/
-packages/    domain/  contracts/  ui/
-services/    api/  workers/  notifications/
-edge/        bridge/  adapters/  simulator/
-infra/       sam/
-tests/       integration/  failure/  fixtures/
-docs/        decisions/  runbooks/  measurements/
+```text
+Custom request: submitted → under review → changes required / rejected / quote ready
+Quote:          draft → issued → accepted / expired / withdrawn
+Order:          awaiting payment → confirmed → ready for handoff → handed over
+Production job: planned → released → executing → awaiting QC → accepted
+Attempt:        created → start intent → running → completed
+Exceptions:     rejected before start / confirmed failed / reconciliation required
+QC:             pending → passed / failed
 ```
 
-Directories are for organising code. A directory is not automatically its own deployable service.
+These describe behavior; implementation may use clearer enum names. Holds retain ownership until reconciled. QC rejection preserves the completed attempt and requires an operator action for replacement. Customer cancellation, refund coordination and a printer cancellation API are outside V1.
 
-## 18. Acceptance demo
+Track simulator connectivity, execution phase, bed occupancy and reservation independently. Completion/failure leaves the bed occupied or unknown until clearance. Consume the clearance for the next start.
 
-1. Upload a model (real, or a clearly marked sample) and show validation and the immutable revision.
-2. Approve the quote and plan, and show the transaction and job creation.
-3. Assign the job to a simulated printer and show the command ID and edge acknowledgement.
-4. Deliver the same command again and show that there is no second start.
-5. Disconnect the bridge during an active attempt. Ownership is kept and the attempt goes to `RECONCILIATION_REQUIRED`.
-6. Reconnect and reconcile, and show the correct physical status.
-7. Show a confirmed failure becoming a new authorised attempt, with the original attempt's cost kept.
-8. End on the measurement dashboard and one real production example, labelled separately from the simulation.
+### Durable one-printer simulator
 
-## 19. Open items to verify before build
+Its small HTTP contract supports:
 
-- The supported Bambu X1C integration path and firmware capabilities, which determine the adapter's capability set.
-- India-region pricing, and whether the region supports every service used.
-- Resin and solvent disposal route (from the SDS and a local authority), plus SPCB/PCC consents before any processing equipment.
-- Contracts with the recycling partner: registration, stream specifications, and ownership of environmental attributes.
-- Payment provider webhook signing and replay semantics.
+- Command submission with stable command ID, attempt ID and payload hash.
+- Observation of current job identity, execution phase and bed occupancy.
+- Documented failure injection through a private development control surface.
+
+The simulator persists command identity before starting. Same ID/content returns the previous outcome; same ID/different payload is rejected. Save the simulated start, execution identity and consumed clearance durably before acknowledging the command, so a restart cannot count the same command as a new execution. Its SQLite journal survives restarts. It is always labeled simulated.
+
+The backend records intent before dispatch. If the simulator starts but its reply is lost, reconcile through a known job identity. If identity cannot be established, retain ownership and require reconciliation. A timeout is not permission to start again.
+
+Demonstrate duplicate delivery, lost start response, backend restart during printing, simulator restart, confirmed failure and occupied-bed refusal. No physical printer, MQTT, vendor adapter or controller failover is needed for V1.
+
+## 7. Small durable worker
+
+A transaction that creates required follow-up also inserts pending work. A worker claims rows, performs work and records outcomes. Use bounded retries, backoff, error reasons and operator-visible exhausted work. Recover abandoned claims after a crash.
+
+This is at-least-once processing, not exactly-once external execution. Stable payment/simulator operation identities make supported retries safe. Do not turn uncertain starts into new attempts automatically.
+
+No arbitrary workflow language, internal event bus or broker abstraction is required. Database records are authoritative; audit history explains changes without event-sourced persistence.
+
+## 8. Deployment and tool exercises
+
+Start locally with Docker Compose, named volumes and synthetic data. A small EC2 instance may host the app and PostgreSQL for the demo; document the single failure domain. Managed PostgreSQL is a later operating decision, not a hiring prerequisite.
+
+Terraform covers only chosen demo infrastructure, storage and scoped permissions. Understand and protect its state; never commit sensitive state or credentials. GitHub Actions tests before deployment and uses a narrowly scoped identity, preferably OIDC federation. Keep a previous working image for rollback; destructive migrations need a separate recovery plan.
+
+Nginx provides HTTPS and same-origin routing. Expose intended web endpoints only. PostgreSQL, simulator, Prometheus, Grafana administration and Actuator management endpoints must not be anonymously reachable from the internet. Retrieve runtime secrets through a documented protected mechanism.
+
+Practice database backup and restore. Stop dispatch during restoration and reconcile restored commands with the independently persisted simulator before resuming: a restored database may contain commands already executed by the simulator.
+
+## 9. Verification and evidence
+
+- Unit tests: quote expiry, revision checks, transitions and QC gates.
+- PostgreSQL integration tests: uniqueness, transaction behavior and competing reservations, with real PostgreSQL or Testcontainers.
+- API tests: customer ownership and operator-only operations.
+- Controlled storage/payment integration checks in test mode.
+- Simulator failure tests: duplicates, dropped responses and restarts.
+- One end-to-end demonstration of the bounded customer/operator workflow.
+
+Do not substitute an in-memory database and assume PostgreSQL transaction behavior is identical. Critical invariants need explicit tests; an arbitrary coverage percentage does not establish correctness.
+
+Use structured logs with request/order/job/attempt/command IDs. Keep unbounded IDs out of metric labels. The initial Prometheus/Grafana exercise covers API errors and latency, pending-work age and failure/reconciliation count. Inject and diagnose one fault; keep monitoring access restricted.
+
+Record actual results in [IMPLEMENTED.md](IMPLEMENTED.md) and the evidence location defined by [V1 scope](docs/v1-scope.md). Distinguish planned, implemented, tested and deployed. Simulated printer behavior is not production manufacturing evidence.
+
+## 10. Stop at completion
+
+Complete the scope checkpoints, demonstrate the workflow and explain the critical code independently. Update the résumé using evidenced capabilities, then freeze/tag the completed release before increasing scope.
+
+The next increment follows measured gaps and [V2 gates](docs/target-architecture.md), not unused technologies. OneCreations stays a separate public site and receives no private customer assets, order records or shared deployment credentials.

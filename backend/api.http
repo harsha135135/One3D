@@ -1,0 +1,46 @@
+# One3D Checkpoint 1 API reference, in .http format for the IntelliJ HTTP
+# client or the VS Code "REST Client" extension. These requests mirror the
+# curl commands recorded in docs/evidence/2026-10-07-checkpoint-1.md; this
+# file itself has not been executed through an HTTP client.
+# The API is unauthenticated in Checkpoint 1 and listens on 127.0.0.1 only.
+
+@baseUrl = http://127.0.0.1:8080
+@demoConfigurationId = 0d3d0000-0000-4000-8000-000000000002
+# Paste the id from the Location header of "Place an order" below.
+@orderId = 00000000-0000-4000-8000-000000000000
+
+### List orderable catalog configurations
+GET {{baseUrl}}/api/catalog/configurations
+
+### Place an order for the seeded demo configuration -> 201 Created + Location
+POST {{baseUrl}}/api/orders
+Content-Type: application/json
+
+{
+  "productConfigurationId": "{{demoConfigurationId}}",
+  "quantity": 1
+}
+
+### Read the order back (set @orderId first) -> 200
+GET {{baseUrl}}/api/orders/{{orderId}}
+
+### Invalid: quantity must be 1 -> 400 VALIDATION_FAILED
+POST {{baseUrl}}/api/orders
+Content-Type: application/json
+
+{
+  "productConfigurationId": "{{demoConfigurationId}}",
+  "quantity": 2
+}
+
+### Invalid: unknown configuration -> 422 CONFIGURATION_NOT_ORDERABLE
+POST {{baseUrl}}/api/orders
+Content-Type: application/json
+
+{
+  "productConfigurationId": "00000000-0000-4000-8000-000000000000",
+  "quantity": 1
+}
+
+### Unknown order -> 404 ORDER_NOT_FOUND
+GET {{baseUrl}}/api/orders/00000000-0000-4000-8000-000000000000
