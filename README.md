@@ -2,9 +2,9 @@
 
 **V1: a focused Java backend portfolio project, built to demonstrate fresher-level engineering skills.**
 
-One3D is the planned custom-manufacturing business of [OneCreations](https://github.com/harsha135135/OneCreations). Its operating software is called **PrintFlow**. Checkpoint 1 of V1 (a catalog order API on Spring Boot and PostgreSQL) is implemented, tested locally and signed off by the owner. Later checkpoints, infrastructure and deployment are not implemented yet, and V1 is not complete.
+One3D is the planned custom-manufacturing business of [OneCreations](https://github.com/harsha135135/OneCreations). Its operating software is called **PrintFlow**. Checkpoint 1 of V1 (a catalog order API on Spring Boot and PostgreSQL) is implemented, tested locally and signed off by the owner. Checkpoint 2 (release, jobs, attempts, a simulated printer, bed clearance and QC) is implemented and tested locally; its owner review is pending. Later checkpoints, infrastructure and deployment are not implemented yet, and V1 is not complete.
 
-Status: Checkpoint 1 complete (signed off 2026-10-09; schema explanation reference-assisted, to revisit) · Scope updated: 2026-10-07
+Status: Checkpoint 1 complete (signed off 2026-10-09; schema explanation reference-assisted, to revisit); Checkpoint 2 implemented and tested locally, owner review pending · Scope updated: 2026-10-07
 
 ## What we are building first
 
@@ -43,9 +43,9 @@ The latest explicit owner instruction takes precedence. Otherwise, `docs/v1-scop
 
 These are planned choices, not claims of hands-on experience. The [scope](docs/v1-scope.md) defines the minimum evidence for each required tool. **Ansible, Jenkins, RabbitMQ, Kafka and local Kubernetes are optional labs.** They must not become prerequisites for finishing V1. There is no required microservice split, message broker, Kubernetes cluster or multi-region deployment.
 
-## Run Checkpoint 1 locally
+## Run it locally
 
-These commands were run on 2026-10-07; results are in the [Checkpoint 1 evidence](docs/evidence/2026-10-07-checkpoint-1.md).
+These commands were run on 2026-10-07 and 2026-10-09; results are in the [Checkpoint 1](docs/evidence/2026-10-07-checkpoint-1.md) and [Checkpoint 2](docs/evidence/2026-10-09-checkpoint-2.md) evidence.
 
 **Prerequisites:** JDK 21 (checked with 21.0.12; point `JAVA_HOME` at it if your default JDK differs) and a running Docker daemon. Maven is not required: use the included `./mvnw` wrapper.
 
@@ -60,6 +60,10 @@ cd backend
 
 # 3. Start the API on http://127.0.0.1:8080 (Ctrl+C to stop)
 ./mvnw spring-boot:run
+
+# 3b. Or start it with the demo-only simulated payment, needed to
+#     walk an order through production before real payments exist
+./mvnw spring-boot:run -Dspring-boot.run.profiles=demo
 ```
 
 The integration tests start their own disposable PostgreSQL container, so step 2 does not need step 1. Stop the local database with `docker compose stop`; its data stays in the `one3d-db` volume.
@@ -70,6 +74,21 @@ The integration tests start their own disposable PostgreSQL container, so step 2
 | `POST /api/orders` | Place a one-line order: `{"productConfigurationId": "…", "quantity": 1}` returns 201 and a `Location` header. `quantity` may be omitted or null (it defaults to 1); any other value returns 400 |
 | `GET /api/orders/{id}` | Read an order and its catalog snapshot |
 
+Operator production endpoints (Checkpoint 2). `/api/ops` is a grouping, not access control:
+
+| Method and path | Purpose |
+|---|---|
+| `POST /api/demo/orders/{id}/simulate-payment` | **Demo profile only.** Confirm an order without payment; the order records `confirmationSource: DEMO_SIMULATED` |
+| `POST /api/ops/orders/{id}/release` | Create the order's production job (order must be `CONFIRMED`) |
+| `POST /api/ops/jobs/{id}/attempts` | Start the next attempt: `{"printerId": "…"}`. Needs an idle printer with a cleared bed. At most 3 attempts per job, counting print failures and QC failures; a 4th returns 409 `ATTEMPT_LIMIT_REACHED` |
+| `POST /api/ops/attempts/{id}/simulate-completion` / `simulate-failure` | Report the simulated printer's outcome; failure takes `{"reason": "…"}` |
+| `POST /api/ops/attempts/{id}/qc` | Whole-part inspection: `{"result": "PASSED" or "FAILED", "notes": "…"}` |
+| `POST /api/ops/printers/{id}/clear-bed` | Operator confirms the bed is empty; nothing clears it automatically |
+| `POST /api/ops/orders/{id}/ready-for-handoff` | Only after the job's part passed QC |
+| `GET /api/ops/jobs/{id}`, `GET /api/ops/printers` | Job with all attempts; printer ownership and bed state |
+
+The seeded printer `0d3d0000-0000-4000-8000-000000000101` is simulated; no real printer is controlled. An invalid step returns 409 with a code such as `BED_NOT_CLEAR` or `JOB_NOT_ACCEPTED`.
+
 ```bash
 curl -s -X POST http://127.0.0.1:8080/api/orders \
   -H "Content-Type: application/json" \
@@ -78,7 +97,7 @@ curl -s -X POST http://127.0.0.1:8080/api/orders \
 
 More requests, including invalid ones, are in [`backend/api.http`](backend/api.http). Errors are `application/problem+json` responses with a stable `code` (for example `VALIDATION_FAILED`, `CONFIGURATION_NOT_ORDERABLE` or `ORDER_NOT_FOUND`).
 
-Checkpoint 1 has **no authentication**. For that reason the API listens on 127.0.0.1 and the database port is published on localhost only. Do not expose either until identity (Checkpoint 4) and the proxy (Checkpoint 7) exist.
+There is **no authentication** before Checkpoint 4. For that reason the API listens on 127.0.0.1 and the database port is published on localhost only. Do not expose either until identity (Checkpoint 4) and the proxy (Checkpoint 7) exist.
 
 ## V1 completion and the next step
 

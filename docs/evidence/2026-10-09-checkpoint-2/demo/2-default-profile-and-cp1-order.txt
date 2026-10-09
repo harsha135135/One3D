@@ -1,0 +1,9 @@
+store.one3d.One3dApplication             : No active profile set, falling back to 1 default profile: "default"
+o.f.core.internal.command.DbMigrate      : Schema "public" is up to date. No migration necessary.
+$ curl -X POST http://127.0.0.1:8080/api/demo/orders/5b13c4e0-c4f3-46dc-8bc3-d30eda513cda/simulate-payment   # default profile
+{"status":404,"code":"NOT_FOUND"}
+HTTP 404
+$ curl http://127.0.0.1:8080/api/orders/5b13c4e0-c4f3-46dc-8bc3-d30eda513cda
+{"status":"AWAITING_PAYMENT","confirmationSource":null}
+$ curl http://127.0.0.1:8080/api/orders/4af6c30c-5288-446a-89b5-2bbcf1bd8702   # Checkpoint 1 order
+{"status":"AWAITING_PAYMENT","confirmedAt":null,"confirmationSource":null,"readyForHandoffAt":null,"total":{"amountMinor":49900,"currency":"INR"}}
