@@ -1,0 +1,6 @@
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 10.80 s <<< FAILURE! -- in store.one3d.requests.CustomRequestsIT
+java.lang.AssertionError: Status expected:<404> but was:<201>
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.043 s <<< FAILURE! -- in store.one3d.files.FilesIT
+java.lang.AssertionError: Status expected:<404> but was:<200>
+[ERROR]   FilesIT.anotherCustomerCannotFinalizeReadOrDownloadTheFile:188 Status expected:<404> but was:<200>
+[ERROR]   CustomRequestsIT.onlyTheCustomersOwnCheckedFileCanBeSubmittedOnce:92 Status expected:<404> but was:<201>

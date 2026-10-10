@@ -1,0 +1,30 @@
+             Body = {"detail":"Request 803d71f6-2305-45be-9d9f-8b33c5059b4f is ORDERED; this quote can no longer be accepted.","instance":"/api/quotes/c7c7ee51-fd5e-4793-983b-28524e3673db/accept","status":409,"title":"Conflict","code":"QUOTE_NOT_CURRENT"}
+[ERROR] Tests run: 6, Failures: 6, Errors: 0, Skipped: 0, Time elapsed: 11.20 s <<< FAILURE! -- in store.one3d.quotes.QuotesIT
+Expecting actual:
+  [200, 409]
+  [200, 200]
+  [200]
+and others were not expected:
+  [409]
+Expecting actual:
+  [200, 409]
+  [200, 200]
+  [200]
+and others were not expected:
+  [409]
+Expecting actual:
+  [409, 200]
+  [200, 200]
+  [200]
+and others were not expected:
+  [409]
+Expecting actual:
+  [200, 409]
+  [200, 200]
+  [200]
+and others were not expected:
+  [409]
+Expecting actual:
+  [200, 409]
+  [200, 200]
+  [200]

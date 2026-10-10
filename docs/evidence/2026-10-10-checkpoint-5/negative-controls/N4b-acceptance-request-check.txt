@@ -1,0 +1,4 @@
+             Body = {"detail":"Cannot order from request 6ac574f3-4029-494e-9b09-0b58db8334c7 while it is SUBMITTED.","instance":"/api/quotes/a8e75194-c455-49ca-840d-c313f621887e/accept","status":409,"title":"Conflict","code":"REQUEST_NOT_QUOTED"}
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 10.95 s <<< FAILURE! -- in store.one3d.quotes.QuotesIT
+java.lang.AssertionError: JSON path "$.code" expected:<QUOTE_NOT_CURRENT> but was:<REQUEST_NOT_QUOTED>
+[ERROR]   QuotesIT.acceptanceChecksTheRequestItselfEvenIfAnOutdatedQuoteWereStillOpen:257 JSON path "$.code" expected:<QUOTE_NOT_CURRENT> but was:<REQUEST_NOT_QUOTED>

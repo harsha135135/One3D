@@ -1,0 +1,5 @@
+browser PUT to storage: 1 request(s) to http://localhost:3000/s3/one3d-artifacts/uploads/<id>
+request page after submit: http://localhost:3000/requests/<id>
+operator download link: /api/ops/requests/<id>/revisions/1/file
+horizontal overflow at 390 px on the request page: 0px
+after accepting: http://localhost:3000/orders/<id>
