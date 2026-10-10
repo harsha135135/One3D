@@ -64,6 +64,8 @@ Reports: [`backend-test-reports/`](2026-10-10-checkpoint-5/backend-test-reports/
 | Catalog and custom orders share production, and production uses the quote's recipe | `order_line.source`; V7 `order_line_source_matches_owner`; release reads `recipe_revision_id` for both | `QuotesIT.aCustomOrderGoesThroughProductionToReadyForHandoff`; real stack section 10; `CustomOrderConstraintsIT` |
 | Snapshot values fit their columns | `QuoteService.itemName` (≤ 120 characters), `CUSTOM-` plus 8 characters (≤ 40), field limits matching columns | `QuotesIT.aLongFileNameIsShortenedToFitTheOrderLine`, `CustomRequestsIT.requirementsLongerThanTheirColumnsAreRefused` |
 
+Design choices and limits for local storage are recorded in [decision 0001](../decisions/0001-local-file-storage-and-upload-checks.md).
+
 ## 3. Schema (V7)
 
 [`V7__files_requests_quotes_custom_orders.sql`](../../backend/src/main/resources/db/migration/V7__files_requests_quotes_custom_orders.sql) adds the following:
@@ -138,6 +140,10 @@ Transcript: [`custom-part-flow.txt`](2026-10-10-checkpoint-5/real-stack/custom-p
 
 The backend and frontend logs from this run contain **no** signed URLs. A search for `X-Amz-Signature` and `X-Amz-Credential` found 0 lines.
 
+After the run:
+- **Order lines:** `SELECT source, count(*) FROM order_line GROUP BY source` returned `CATALOG | 19` and `CUSTOM_QUOTE | 4`. The earlier catalog orders were backfilled.
+- **Storage restart:** `docker compose restart storage` (without `storage-init`) kept bucket versioning `Enabled` and both stored versions of the revision 2 key. A GET by the pinned `versionId` returned bytes whose SHA-256 matched the recorded one.
+
 ### Real browser
 
 A Chromium session signed in through the mock provider's form, then used the real pages ([`browser-run.txt`](2026-10-10-checkpoint-5/screenshots/browser-run.txt)):
@@ -164,6 +170,8 @@ Screenshots: [`screenshots/`](2026-10-10-checkpoint-5/screenshots/).
   - Locally, anyone who can reach `localhost:3000/s3` can write to the bucket. The local stack is for one developer.
   - The application's own checks are tested here: size at finalize, structure, version pinning and ownership.
   - **Owed in CP7:** that S3 itself refuses a wrong size, type, expired or tampered URL, and that the bucket is private, versioned and has the CORS rule for direct browser uploads, all on the real bucket.
+- **The `aws` profile must replace every local storage default** in `application.yaml`: `endpoint` `127.0.0.1:9090`, `public-endpoint` `localhost:3000/s3`, the `local-dev-only` keys and path style.
+  - **Owed in CP7:** the startup guard already owed for the mock identity provider must also refuse local storage settings under `aws`. Otherwise the deployed app would sign URLs with dummy keys pointing at localhost.
 - **Test failure output can contain presigned URLs.**
   - When a MockMvc request in a failing test returns a redirect, Spring prints the response, including the `Location` header.
   - These URLs point at a throwaway test container, are signed with the dummy `local-dev-only` key and expire within minutes. The application itself never logs them.
