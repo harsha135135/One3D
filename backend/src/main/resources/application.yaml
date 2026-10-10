@@ -71,7 +71,8 @@ one3d:
     connect-timeout: 1s
     request-timeout: 3s
   worker:
-    # Background delivery of start commands and polling of running prints.
+    # Background work: delivery of start commands, polling of running prints
+    # and checking uploaded files.
     enabled: true
     poll-interval: 1s
     batch-size: 10
@@ -81,6 +82,30 @@ one3d:
     max-attempts: 5
     # Wait before the 2nd try; doubled for each later try.
     retry-backoff: 2s
+  storage:
+    # Private, versioned object storage for uploaded models: S3 on AWS, the
+    # S3Mock container from compose.yaml locally. The application never creates
+    # or configures the bucket; Terraform (AWS) or compose.yaml (local) does.
+    bucket: ${ONE3D_STORAGE_BUCKET:one3d-artifacts}
+    region: ${ONE3D_STORAGE_REGION:ap-south-1}
+    # Where the backend reaches storage. Empty means AWS S3 itself.
+    endpoint: ${ONE3D_STORAGE_ENDPOINT:http://127.0.0.1:9090}
+    # Where presigned URLs point: the browser uploads and downloads there.
+    # Locally that is the frontend's /s3 path, which Next.js forwards to S3Mock
+    # (same origin, so no CORS). Empty means AWS S3 itself.
+    public-endpoint: ${ONE3D_STORAGE_PUBLIC_ENDPOINT:http://localhost:3000/s3}
+    path-style: ${ONE3D_STORAGE_PATH_STYLE:true}
+    # For the local mock only. Empty means the AWS default credentials chain
+    # (the instance role on AWS); real keys are never configured here.
+    access-key: ${ONE3D_STORAGE_ACCESS_KEY:local-dev-only}
+    secret-key: ${ONE3D_STORAGE_SECRET_KEY:local-dev-only}
+    upload-ttl: 15m
+    download-ttl: 5m
+  files:
+    # V1 accepts one STL of at most 20 MiB per submission revision.
+    max-upload-bytes: 20971520
+    # Tries to read and check an uploaded file before the work is EXHAUSTED.
+    verify-max-attempts: 5
   demo:
     # Demo-only shortcut that confirms an order without payment
     # (POST /api/demo/orders/{id}/simulate-payment). Off by default; the "demo"
