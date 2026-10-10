@@ -42,6 +42,13 @@ New backend tests:
 | `QuotesIT` | 20 | Accepted scope back to the file version. Repeat acceptance. **Two races, each repeated 5 times.** Expiry, withdrawal by a new revision, re-quoting, quotable states, another customer, a 200-character file name, a custom order through production to handoff, and acceptance re-checking the request |
 | `CustomOrderConstraintsIT` | 14 | The V7 rules enforced by PostgreSQL with direct SQL (section 3) |
 
+CI ([run 38070790632](https://github.com/harsha135135/One3D/actions/runs/38070790632) on `3038319`, PR #6) passed all three jobs:
+- simulator: 14 tests;
+- backend: 34 unit and 148 integration tests, in 2 min 34 s;
+- frontend: lint, build, types and 20 Playwright runs.
+
+The integration tests pulled `adobe/s3mock:5.2` on the GitHub runner.
+
 Reports: [`backend-test-reports/`](2026-10-10-checkpoint-5/backend-test-reports/) and [`frontend/playwright-smoke.txt`](2026-10-10-checkpoint-5/frontend/playwright-smoke.txt).
 
 ## 2. Rules, enforcement and tests
