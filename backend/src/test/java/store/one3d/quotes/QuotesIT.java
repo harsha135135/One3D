@@ -245,6 +245,21 @@ class QuotesIT {
     }
 
     @Test
+    void acceptanceChecksTheRequestItselfEvenIfAnOutdatedQuoteWereStillOpen() throws Exception {
+        String requestId = requests.submitted(alice, "stale.stl");
+        String quoteId = requests.quoted(requestId, 50_000);
+        requests.revise(alice, requestId).andExpect(status().isCreated());
+        // Simulate a missed withdrawal: the quote for revision 1 is open again.
+        jdbc.sql("UPDATE quote SET status = 'ISSUED', withdrawn_at = NULL WHERE id = ?::uuid").param(quoteId).update();
+
+        requests.accept(alice, quoteId)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("QUOTE_NOT_CURRENT"));
+
+        assertThat(ordersForQuote(quoteId)).isZero();
+    }
+
+    @Test
     void reQuotingWithdrawsTheEarlierQuote() throws Exception {
         String requestId = requests.submitted(alice, "requote.stl");
         String first = requests.quoted(requestId, 50_000);
