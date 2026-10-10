@@ -176,7 +176,8 @@ class CustomRequestsIT {
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andReturn().getResponse().getHeader("Location");
 
-        assertThat(location).contains("versionId=" + versionId);
+        // A boolean check, so a failure never prints the signed URL.
+        assertThat(location.contains("versionId=" + versionId)).as("download link pins the checked version").isTrue();
         assertThat(storage.download(java.net.URI.create(location)).body()).isEqualTo(model);
         mvc.perform(get("/api/ops/requests/{id}/revisions/2/file", requestId))
                 .andExpect(status().isNotFound())

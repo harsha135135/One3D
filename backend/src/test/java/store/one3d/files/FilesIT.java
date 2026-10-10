@@ -217,7 +217,8 @@ class FilesIT {
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(header().string("Referrer-Policy", "no-referrer"))
                 .andReturn().getResponse().getHeader("Location");
-        assertThat(location).contains("versionId=" + pinned);
+        // A boolean check, so a failure never prints the signed URL.
+        assertThat(location.contains("versionId=" + pinned)).as("download link pins the checked version").isTrue();
 
         HttpResponse<byte[]> downloaded = storage.download(URI.create(location));
         assertThat(downloaded.statusCode()).isEqualTo(200);
