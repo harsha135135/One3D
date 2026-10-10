@@ -28,15 +28,26 @@ export function Header() {
           <li>
             <Link href="/">Catalog</Link>
           </li>
+          <li>
+            <Link href="/requests/new">Custom part</Link>
+          </li>
           {session.status === "signed-in" && (
-            <li>
-              <Link href="/orders">My orders</Link>
-            </li>
+            <>
+              <li>
+                <Link href="/orders">My orders</Link>
+              </li>
+              <li>
+                <Link href="/requests">My requests</Link>
+              </li>
+            </>
           )}
           {isOperator(session) && (
             <>
               <li>
                 <Link href="/ops">Operations</Link>
+              </li>
+              <li>
+                <Link href="/ops/requests">Requests</Link>
               </li>
               <li>
                 <Link href="/ops/printers">Printers</Link>

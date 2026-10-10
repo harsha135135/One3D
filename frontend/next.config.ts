@@ -17,6 +17,19 @@ const nextConfig: NextConfig = {
     // forwarding limit is 10 MB. On AWS the browser uploads straight to S3.
     proxyClientMaxBodySize: "25mb",
   },
+  async headers() {
+    return [
+      {
+        // Stored files are never rendered as pages on this origin, even if the
+        // storage response were wrong: no type sniffing, no scripts, no frames.
+        source: "/s3/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Content-Security-Policy", value: "default-src 'none'; sandbox" },
+        ],
+      },
+    ];
+  },
   async rewrites() {
     return [
       { source: "/api/:path*", destination: `${backend}/api/:path*` },

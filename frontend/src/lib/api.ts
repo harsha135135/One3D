@@ -2,7 +2,25 @@
 // automatically (same origin). State-changing requests also send the CSRF
 // token from the XSRF-TOKEN cookie in the X-XSRF-TOKEN header.
 
-import type { Attempt, CatalogItem, Job, Me, Order, Page, Printer, QueueItem, Work } from "./types";
+import type {
+  Artifact,
+  Attempt,
+  CatalogItem,
+  CustomRequest,
+  IssueQuote,
+  Job,
+  Me,
+  Order,
+  Page,
+  Printer,
+  QueueItem,
+  Quote,
+  RequestStatus,
+  RequestSummary,
+  Requirements,
+  UploadStart,
+  Work,
+} from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -77,9 +95,53 @@ export const api = {
   clearBed: (printer: Printer) =>
     post<Printer>(`/api/ops/printers/${printer.id}/clear-bed`, { attemptId: printer.bedCycleAttemptId }),
   exhaustedWork: () => get<Work[]>("/api/ops/work?status=EXHAUSTED"),
+  retryVerification: (artifactId: string) => post<Artifact>(`/api/ops/files/${artifactId}/retry-verification`),
+
+  startUpload: (filename: string, sizeBytes: number) => post<UploadStart>("/api/files/uploads", { filename, sizeBytes }),
+  finalizeUpload: (artifactId: string) => post<Artifact>(`/api/files/${artifactId}/finalize`),
+  file: (artifactId: string) => get<Artifact>(`/api/files/${artifactId}`),
+
+  submitRequest: (requirements: Requirements) => post<CustomRequest>("/api/requests", requirements),
+  reviseRequest: (requestId: string, requirements: Requirements) =>
+    post<CustomRequest>(`/api/requests/${requestId}/revisions`, requirements),
+  myRequests: (page: number) => get<Page<RequestSummary>>(`/api/requests?page=${page}&size=10`),
+  myRequest: (id: string) => get<CustomRequest>(`/api/requests/${id}`),
+  myRequestQuotes: (id: string) => get<Quote[]>(`/api/requests/${id}/quotes`),
+  acceptQuote: (quoteId: string) => post<Order>(`/api/quotes/${quoteId}/accept`),
+
+  opsRequests: (status: RequestStatus, page: number) =>
+    get<Page<RequestSummary>>(`/api/ops/requests?status=${status}&page=${page}&size=20`),
+  opsRequest: (id: string) => get<CustomRequest>(`/api/ops/requests/${id}`),
+  opsRequestQuotes: (id: string) => get<Quote[]>(`/api/ops/requests/${id}/quotes`),
+  requestChanges: (id: string, message: string) => post<CustomRequest>(`/api/ops/requests/${id}/request-changes`, { message }),
+  rejectRequest: (id: string, message: string) => post<CustomRequest>(`/api/ops/requests/${id}/reject`, { message }),
+  issueQuote: (id: string, quote: IssueQuote) => post<Quote>(`/api/ops/requests/${id}/quotes`, quote),
 
   logout: () => post<void>("/logout"),
 };
+
+/** Download links: the backend checks access, then redirects to a short-lived link for the exact version. */
+export const downloadUrl = {
+  ownFile: (artifactId: string) => `/api/files/${artifactId}/download`,
+  revisionFile: (requestId: string, revisionNumber: number) =>
+    `/api/ops/requests/${requestId}/revisions/${revisionNumber}/file`,
+};
+
+/**
+ * Sends the file straight to storage with the presigned URL, exactly as
+ * signed (size and headers). No cookies or CSRF token go to storage.
+ */
+export async function putToStorage(upload: UploadStart["upload"], file: File): Promise<void> {
+  const response = await fetch(upload.url, {
+    method: "PUT",
+    headers: upload.headers,
+    body: file,
+    credentials: "omit",
+  });
+  if (!response.ok) {
+    throw new ApiError(response.status, "UPLOAD_FAILED", "The file could not be uploaded to storage.");
+  }
+}
 
 /** A message for the person using the page, from any error the API calls raise. */
 export function describeError(error: unknown): string {

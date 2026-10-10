@@ -34,6 +34,9 @@ function Queue() {
 
   useEffect(load, [load]);
 
+  const starts = work.filter((w) => w.kind === "DISPATCH_START");
+  const checks = work.filter((w) => w.kind === "VERIFY_ARTIFACT" && w.artifactId);
+
   async function act(action: () => Promise<unknown>, done: string) {
     setBusy(true);
     setError(null);
@@ -52,11 +55,31 @@ function Queue() {
   return (
     <>
       <h1>Operations</h1>
-      {work.length > 0 && (
+      {starts.length > 0 && (
         <p className="notice" role="alert">
-          {work.length} print start(s) could not be confirmed after all retries. Open the job and choose “Check
+          {starts.length} print start(s) could not be confirmed after all retries. Open the job and choose “Check
           again”.
         </p>
+      )}
+      {checks.length > 0 && (
+        <div className="notice" role="alert">
+          <p>{checks.length} uploaded file check(s) could not read storage after all retries.</p>
+          <ul>
+            {checks.map((w) => (
+              <li key={w.id}>
+                File {shortId(w.artifactId)}: {w.lastError ?? "no error recorded"}{" "}
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={busy}
+                  onClick={() => act(() => api.retryVerification(w.artifactId!), "File check queued again.")}
+                >
+                  Retry check
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       <div className="form-row">
         <label>
