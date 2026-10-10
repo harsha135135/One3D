@@ -41,6 +41,16 @@ public class OrderService {
     }
 
     /**
+     * Places the order for an accepted quote. Called by the quotes module inside
+     * its acceptance transaction, so the order and the accepted quote are
+     * committed together or not at all.
+     */
+    @Transactional
+    public OrderResponse placeFromQuote(UUID customerId, QuotedItem item) {
+        return OrderResponse.from(orders.save(CustomerOrder.placeFromQuote(customerId, item, Timestamps.now())));
+    }
+
+    /**
      * Confirms an order as commercially eligible, for any confirmation source.
      * Checkpoint 6 calls it after a verified test-mode payment; the demo
      * shortcut uses {@link #confirmDemoPayment}. Confirmation never creates a

@@ -17,7 +17,8 @@ import store.one3d.catalog.CatalogSnapshot;
 import java.util.UUID;
 
 /**
- * The single line of an order: a snapshot of the catalog at order time.
+ * The single line of an order: a snapshot of the catalog, or of an accepted
+ * quote, at order time.
  * {@code @Immutable} tells Hibernate never to issue UPDATE statements for it.
  */
 @Entity
@@ -76,6 +77,21 @@ class OrderLine {
         this.productName = item.productName();
         this.configurationCode = item.configurationCode();
         this.configurationDescription = item.configurationDescription();
+        this.recipeRevisionNumber = item.recipeRevisionNumber();
+        this.quantity = quantity;
+        this.unitPriceMinor = item.unitPriceMinor();
+        this.currency = item.currency();
+    }
+
+    /** A line for an accepted quote: the quote and the exact recipe revision it priced. */
+    OrderLine(CustomerOrder order, QuotedItem item, int quantity) {
+        this.order = order;
+        this.source = LineSource.CUSTOM_QUOTE;
+        this.quoteId = item.quoteId();
+        this.recipeRevisionId = item.recipeRevisionId();
+        this.productName = item.itemName();
+        this.configurationCode = item.itemCode();
+        this.configurationDescription = item.itemDescription();
         this.recipeRevisionNumber = item.recipeRevisionNumber();
         this.quantity = quantity;
         this.unitPriceMinor = item.unitPriceMinor();

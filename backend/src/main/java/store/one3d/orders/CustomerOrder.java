@@ -73,6 +73,16 @@ class CustomerOrder {
         return order;
     }
 
+    /** Creates a new order awaiting payment for an accepted quote, copying the quote's values. */
+    static CustomerOrder placeFromQuote(UUID customerId, QuotedItem item, Instant createdAt) {
+        CustomerOrder order = new CustomerOrder();
+        order.customerId = customerId;
+        order.status = OrderStatus.AWAITING_PAYMENT;
+        order.createdAt = createdAt;
+        order.line = new OrderLine(order, item, V1_QUANTITY);
+        return order;
+    }
+
     /**
      * Marks the order as commercially eligible for production. This does not
      * release or start anything: an operator releases production separately.

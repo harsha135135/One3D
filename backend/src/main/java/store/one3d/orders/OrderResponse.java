@@ -17,8 +17,14 @@ public record OrderResponse(
         Line line,
         Money total) {
 
+    /**
+     * {@code source} says where the item came from: CATALOG lines have a
+     * {@code productConfigurationId}, CUSTOM_QUOTE lines a {@code quoteId}.
+     */
     public record Line(
+            LineSource source,
             UUID productConfigurationId,
+            UUID quoteId,
             String productName,
             String configurationCode,
             String configurationDescription,
@@ -39,7 +45,9 @@ public record OrderResponse(
                 order.getConfirmationSource(),
                 order.getReadyForHandoffAt(),
                 new Line(
+                        line.getSource(),
                         line.getProductConfigurationId(),
+                        line.getQuoteId(),
                         line.getProductName(),
                         line.getConfigurationCode(),
                         line.getConfigurationDescription(),
