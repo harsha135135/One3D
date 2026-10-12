@@ -1,0 +1,36 @@
+# A failing test blocks promotion (2026-10-12)
+Draft PR #9 (https://github.com/harsha135135/One3D/pull/9), branch demo/checkpoint-7-failing-test,
+commit 1d57e2e: one expected value in CustomerOrderTest changed from 49,900 to 49,800. Closed, not merged.
+
+## 1. CI on the pull request (run 38232998671)
+event pull_request, commit 1d57e2e, conclusion failure
+  Simulator tests: success
+  Backend tests (PostgreSQL, simulator and S3Mock containers): failure
+  Frontend checks (lint, build, types, browser smoke tests): success
+  Images (built on every run; pushed to ECR from main): skipped
+  Deploy to the demo (main only): skipped
+  [ERROR] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.087 s <<< FAILURE! -- in store.one3d.orders.CustomerOrderTest
+  [ERROR] store.one3d.orders.CustomerOrderTest.totalIsUnitPriceTimesQuantityInTheLineCurrency -- Time elapsed: 0.043 s <<< FAILURE!
+  expected: Money[amountMinor=49800, currency=INR]
+   but was: Money[amountMinor=49900, currency=INR]
+
+## 2. The deploy workflow on main, asked to deploy that commit (run 38233005755)
+conclusion failure
+  Run actions/checkout@v5: success
+  The commit's CI run on main passed: failure
+  Run aws-actions/configure-aws-credentials@v6: skipped
+  Its images are in ECR: skipped
+  Deploy through SSM: skipped
+  No successful CI run on main for 1d57e2e4bc49fcf1b239e93b23573655625d39b8
+  (it stops before AWS credentials are requested)
+
+## 3. The deploy workflow started from the demo branch instead of main (run 38233049728)
+branch demo/checkpoint-7-failing-test: conclusion skipped
+  Deploy ${{ inputs.sha }}: skipped
+  (the job runs only on main; the AWS deploy role also trusts only main)
+
+## 4. Branch protection
+GET branches/main/protection: HTTP 403 Upgrade to GitHub Pro or make this repository public to enable this feature.
+GitHub does not stop a red PR from being merged on this private repository and plan; merging only green PRs is a
+process rule. What is enforced is promotion: images are pushed and deployed only from main after every test job
+passes, and a manual deploy needs a successful CI run on main for that exact commit.
