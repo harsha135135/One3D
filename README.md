@@ -87,7 +87,7 @@ docker compose up -d --build   # PostgreSQL, simulator, mock identity provider, 
 # then open http://localhost:8088
 ```
 
-These are the images that run on AWS, behind a local Nginx with the deployed routing, published on 127.0.0.1 only. The backend uses the demo payment shortcut, so no keys are needed. Sign in as described below. Recreating the containers (`docker compose up -d --force-recreate`) or stopping them (`docker compose stop`) keeps the data in Docker volumes; `docker compose down -v` deletes it. This uses the same ports as the steps above, so run one or the other.
+These are the images that run on AWS, behind a local Nginx with the deployed routing, published on 127.0.0.1 only. The backend uses the demo payment shortcut, so no keys are needed. Metrics come with it: Grafana's "One3D overview" dashboard on http://localhost:3001 (admin / `local-dev-only`) and Prometheus on http://localhost:9091. The backend's health and metrics are on its management port (8081), which is not published; its logs are JSON lines (`docker compose logs backend`). Sign in as described below. Recreating the containers (`docker compose up -d --force-recreate`) or stopping them (`docker compose stop`) keeps the data in Docker volumes; `docker compose down -v` deletes it. This uses the same ports as the steps above, so run one or the other.
 
 ### The deployed demo
 
