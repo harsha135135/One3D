@@ -140,7 +140,8 @@ jobs:
       - name: Deploy bundle (Compose files, Nginx, deploy script) to S3
         if: env.PUSH == 'true'
         run: |
-          tar -czf "$RUNNER_TEMP/bundle.tar.gz" compose.yaml compose.deploy.yaml infra/nginx/bootstrap infra/nginx/https infra/deploy
+          tar -czf "$RUNNER_TEMP/bundle.tar.gz" compose.yaml compose.deploy.yaml infra/nginx/bootstrap infra/nginx/https \
+            infra/monitoring infra/deploy
           aws s3 cp "$RUNNER_TEMP/bundle.tar.gz" "s3://${{ vars.OPS_BUCKET }}/deploy/${{ github.sha }}.tar.gz" --only-show-errors
 
   deploy:

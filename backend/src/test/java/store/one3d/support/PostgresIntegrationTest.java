@@ -26,6 +26,8 @@ import java.lang.annotation.Target;
         "one3d.worker.enabled=false",
         "one3d.worker.retry-backoff=0s",
         "one3d.simulator.request-timeout=2s",
+        // Work-queue gauges read the table on every scrape instead of every 5 s.
+        "one3d.metrics.work-refresh=0s",
         // Orders are paid the real way: a test-mode checkout (FakeRazorpay)
         // and a signed webhook. These are dummy values, never real keys.
         "one3d.payments.razorpay.enabled=true",

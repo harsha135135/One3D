@@ -1,9 +1,14 @@
 # Configuration for the backend, read by deploy.sh on the instance.
-# The database password and the OIDC client secret are generated here and are
-# therefore in the (private, encrypted) Terraform state; Razorpay's keys are
-# put in by hand with the AWS CLI and never are.
+# The database password, the OIDC client secret and Grafana's admin password
+# are generated here and are therefore in the (private, encrypted) Terraform
+# state; Razorpay's keys are put in by hand with the AWS CLI and never are.
 
 resource "random_password" "db" {
+  length  = 32
+  special = false
+}
+
+resource "random_password" "grafana_admin" {
   length  = 32
   special = false
 }
@@ -39,6 +44,13 @@ resource "aws_ssm_parameter" "db_password" {
   name  = "${local.params}/one3d-db-password"
   type  = "SecureString"
   value = random_password.db.result
+}
+
+# Grafana is reached only through SSM port forwarding; its admin still needs a password.
+resource "aws_ssm_parameter" "grafana_admin_password" {
+  name  = "${local.params}/one3d-grafana-admin-password"
+  type  = "SecureString"
+  value = random_password.grafana_admin.result
 }
 
 resource "aws_ssm_parameter" "oidc_client_secret" {

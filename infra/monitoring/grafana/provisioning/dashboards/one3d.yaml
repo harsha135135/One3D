@@ -1,0 +1,10 @@
+# Dashboards are files in this repository; changes made in Grafana's UI are not kept.
+apiVersion: 1
+providers:
+  - name: one3d
+    folder: One3D
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards

@@ -95,23 +95,29 @@ class DispatchOutcomes {
         return attempts.commandsOfRunningAttempts();
     }
 
-    /** Applies an execution end reported by the simulator, if the attempt is still running. */
+    /**
+     * Applies an execution end reported by the simulator, if the attempt is
+     * still running. Returns true if it recorded a completion or failure.
+     */
     @Transactional
-    public void recordExecutionEnd(UUID commandId, SimulatorClient.CommandReport report) {
+    public boolean recordExecutionEnd(UUID commandId, SimulatorClient.CommandReport report) {
         PrinterCommand command = commands.findById(commandId).orElseThrow();
         Optional<PrintAttempt> found = attempts.findWithJob(command.getAttemptId());
         if (found.isEmpty() || found.get().getStatus() != AttemptStatus.RUNNING) {
-            return;
+            return false;
         }
         PrintAttempt attempt = found.get();
         Printer printer = printers.findForUpdate(attempt.getPrinterId()).orElseThrow();
         Instant now = Timestamps.now();
         if ("COMPLETED".equals(report.phase())) {
             attempt.getJob().completeAttempt(attempt, printer, now);
+            return true;
         } else if ("FAILED".equals(report.phase())) {
             String reason = report.failureReason() == null ? "Failed (no reason reported)" : report.failureReason();
             attempt.getJob().failAttempt(attempt, printer, reason, now);
+            return true;
         }
+        return false;
     }
 
     private Duration backoffFor(int attemptsSoFar) {

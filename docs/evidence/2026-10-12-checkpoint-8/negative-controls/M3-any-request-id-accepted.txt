@@ -1,0 +1,7 @@
+# M3-any-request-id-accepted: RequestIdFilter.java changed: 'inbound != null && ACCEPTED.matcher(inbound).matches()' -> 'inbound != null'
+build exit code: 1 (restored with cmp: yes)
+Tests run: 4, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.080 s <<< FAILURE! -- in store.one3d.common.LogContextTest
+store.one3d.common.LogContextTest.anythingElseInTheHeaderIsReplacedSoItCannotWriteIntoTheLogs -- Time elapsed: 0.005 s <<< FAILURE!
+Expecting actual:
+Expecting actual:
+Tests run: 4, Failures: 1, Errors: 0, Skipped: 0

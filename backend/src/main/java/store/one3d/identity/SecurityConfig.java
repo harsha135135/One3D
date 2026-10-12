@@ -3,8 +3,11 @@ package store.one3d.identity;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenDecoderFactory;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenValidator;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
@@ -34,6 +37,10 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
  *
  * Every state-changing request needs the CSRF token: the browser reads the
  * {@code XSRF-TOKEN} cookie and sends it back as the {@code X-XSRF-TOKEN} header.
+ *
+ * <p>Health and Prometheus metrics are served only on the separate management
+ * port ({@code management.server.port}), which is never published and which
+ * Nginx does not route to; Prometheus reads them on the internal network.
  */
 @Configuration
 class SecurityConfig {
@@ -42,7 +49,21 @@ class SecurityConfig {
     private static final RequestMatcher RAZORPAY_WEBHOOK =
             PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/payments/razorpay/webhook");
 
+    /** Read-only health and metrics, without a session; only on the unpublished management port. */
     @Bean
+    @Order(1)
+    SecurityFilterChain managementFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher(EndpointRequest.to("health", "prometheus"))
+                .authorizeHttpRequests(requests -> requests.anyRequest().permitAll())
+                .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .csrf(csrf -> csrf.disable())
+                .requestCache(cache -> cache.disable());
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
     SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityProblems problems,
                                             @Value("${one3d.public-url}") String publicUrl) throws Exception {
         http

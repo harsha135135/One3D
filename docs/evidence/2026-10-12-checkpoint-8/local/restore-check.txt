@@ -1,0 +1,35 @@
+
+## 1. A fresh backup of the live database (20261012T113817Z)
+pg_dump (custom format): 88190 bytes
+
+## 2. Restore into a separate database (one3d_restore_check) on the same server
+NOTICE:  database "one3d_restore_check" does not exist, skipping
+migrations in the copy: 1,2,3,4,5,6,7,8
+
+## 3. Row counts, live and restored (the demo was idle, so they should match)
+  customer_order       live 30   restored 30   identical
+  order_line           live 30   restored 30   identical
+  order_fact           live 81   restored 81   identical
+  checkout             live 4    restored 4    identical
+  payment              live 6    restored 6    identical
+  payment_event        live 5    restored 5    identical
+  production_job       live 17   restored 17   identical
+  print_attempt        live 11   restored 11   identical
+  printer_command      live 9    restored 9    identical
+  bed_clearance        live 8    restored 8    identical
+  artifact             live 27   restored 27   identical
+  custom_request       live 12   restored 12   identical
+  submission_revision  live 17   restored 17   identical
+  quote                live 17   restored 17   identical
+  pending_work         live 31   restored 31   identical
+
+## 4. One order and what it links to, read from both databases
+order 194d3c03, restored: HANDED_OVER | RAZORPAY_TEST | Custom part: wall hook.stl | recipe revision 1 | RECONCILIATION APPLIED 34900 INR | job ACCEPTED | attempt 1 COMPLETED QC PASSED | command ACKNOWLEDGED | 6 timeline facts
+live and restored: identical
+
+## 5. One checked file: the restored record still names its exact stored version
+file cfd18e06: version 1e295b7b…, record in live and restored: identical
+that version read from storage: 584 bytes; SHA-256 matches the restored record: yes
+
+## 6. Remove the copy
+dropped one3d_restore_check; the live database and the application were not changed

@@ -18,7 +18,10 @@ USER one3d
 # proxy (and, locally, nothing else) can reach it on the internal network.
 ENV SERVER_ADDRESS=0.0.0.0 \
     JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError"
-EXPOSE 8080
+# 8080: the API (behind Nginx). 8081: health and Prometheus metrics, read on
+# the internal network only.
+EXPOSE 8080 8081
+# Healthy when the application reports UP (which includes reaching its database).
 HEALTHCHECK --interval=10s --timeout=3s --start-period=60s --retries=6 \
-    CMD ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+    CMD ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8081 && printf 'GET /actuator/health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '\"status\":\"UP\"' <&3"]
 ENTRYPOINT ["java", "-jar", "/app/backend.jar"]

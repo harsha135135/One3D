@@ -2,10 +2,17 @@
 # The same split as the deployed site, plus /s3 for the local storage stand-in.
 resolver 127.0.0.11 valid=10s ipv6=off;
 
+# Access log without query strings (sign-in codes and presigned URLs stay out),
+# with Nginx's request id, which the backend logs as request_id. Each server
+# below uses it in place of the image's default format.
+log_format one3d '$remote_addr [$time_local] "$request_method $uri $server_protocol" $status '
+                 '$body_bytes_sent $request_time rid=$request_id';
+
 server {
     listen 80;
     server_name localhost;
     server_tokens off;
+    access_log /var/log/nginx/access.log one3d;
     client_max_body_size 1m;
 
     set $backend http://backend:8080;
@@ -18,6 +25,7 @@ server {
         proxy_set_header Host $http_host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Request-Id $request_id;
     }
 
     # Presigned uploads and downloads (local only; on AWS the browser talks to S3).
