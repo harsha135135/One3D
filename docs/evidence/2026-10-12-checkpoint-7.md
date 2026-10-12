@@ -137,9 +137,7 @@ All runs used the synthetic demo users and Razorpay test mode. Output: [`cloud/p
 
 ## Owed
 
-- ~~Real webhook delivery from Razorpay~~: done; see the addendum.
-- **A rollback run** with "Deploy a commit" that changes what serves the site. The first attempt found a deploy defect (addendum); it is repeated after the fix is deployed.
-- **The CSP change live and checked** on the site, which needs the same fix.
+Nothing. Real webhook delivery, the rollback run and the live CSP change were completed afterwards; see the two addenda.
 
 ## Known limitations
 
@@ -176,3 +174,27 @@ PR #10 merged as `dc26125`. CI on `main` ([run 38236403998](https://github.com/h
 - **After this follow-up merges,** the rollback run is repeated (to `70ef808` and forward again), and the CSP change is checked live. Until then, Checkpoint 7's rollback item stays owed.
 
 **Runtime:** 10:31–10:40 UTC, then stopped again with a backup.
+
+## Addendum 2: rollback and the CSP change, after the fix (2026-10-12, 10:56–11:04 UTC)
+
+The fix merged as `15ff7c2` (PR #11; the fix itself is `8b1837d`). CI on `main` ([run 38239091599](https://github.com/harsha135135/One3D/actions/runs/38239091599)) passed and skipped the deploy, because the demo was stopped.
+
+**Deploy, revert and deploy again: passed.** [`cloud/rollback.txt`](2026-10-12-checkpoint-7/cloud/rollback.txt) ([script](2026-10-12-checkpoint-7/cloud/rollback.sh))
+
+| Step | Run | Instance | Live `script-src` | Nginx |
+|---|---|---|---|---|
+| `demo.sh start` deploys `15ff7c2` | [38239605669](https://github.com/harsha135135/One3D/actions/runs/38239605669) | deployed `15ff7c2`, previous `dc26125` | with `https://cdn.razorpay.com` | started 10:58:32, during this deploy |
+| Roll back to `70ef808` | [38239757583](https://github.com/harsha135135/One3D/actions/runs/38239757583) | deployed `70ef808`, previous `15ff7c2` | without it (the old policy) | started 10:59:58, after the dispatch at 10:59:23 |
+| Forward again to `15ff7c2` | [38239910658](https://github.com/harsha135135/One3D/actions/runs/38239910658) | deployed `15ff7c2`, previous `70ef808` | with it | started 11:01:19, after the dispatch at 11:00:43 |
+
+- **What was checked after each step:** the live header, Nginx's rendered config and the tag files, read from outside and through SSM. The site answered 200 after each.
+- **What was and was not exercised:** the images are the same in both revisions (same digests), and there is no migration between them. So these runs show the deploy mechanism changing what serves the site, here through the Nginx configuration.
+  - Both live transitions recreated Nginx because the label was added or removed.
+  - The case later deploys will hit, a labelled hash that changes, was checked only locally with Compose.
+  - A deploy between two revisions from before the fix (both without the label) still leaves Nginx as it is. The runbook says to stop and start the demo in that case.
+
+**CSP change live: checked.** [`cloud/pay-after-fix.txt`](2026-10-12-checkpoint-7/cloud/pay-after-fix.txt)
+- **The payment:** order `5210e7fc` was paid in hosted Checkout under the deployed policy, with **0 CSP violations**. Razorpay's risk-detection script now loads.
+- **The webhook confirmed it again:** `payment.captured` APPLIED (source `WEBHOOK`), `order.paid` ALREADY_RECORDED, `payment.authorized` IGNORED.
+
+**Deployed revision:** `15ff7c2`. **Runtime:** 10:56–11:04 UTC, then stopped with a backup (`one3d-20261012T110314Z.dump`).
