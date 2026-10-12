@@ -1,0 +1,26 @@
+[ERROR] Tests run: 10, Failures: 5, Errors: 0, Skipped: 0, Time elapsed: 16.72 s <<< FAILURE! -- in store.one3d.quotes.QuotesIT
+Expecting actual:
+  "{"detail":"The record was changed by another request at the same time. Reload and try again.","instance":"/api/requests/11a97b1b-f7ce-4a05-951a-6399e15d8a86/revisions","status":409,"title":"Conflict","code":"CONCURRENT_MODIFICATION"}"
+Expecting actual:
+  "{"detail":"The record was changed by another request at the same time. Reload and try again.","instance":"/api/requests/b0632538-027e-489d-844c-b580e0d187f4/revisions","status":409,"title":"Conflict","code":"CONCURRENT_MODIFICATION"}"
+Expecting actual:
+  "{"detail":"The record was changed by another request at the same time. Reload and try again.","instance":"/api/requests/838d32df-1693-45d2-97b2-c4baba351dc2/revisions","status":409,"title":"Conflict","code":"CONCURRENT_MODIFICATION"}"
+Expecting actual:
+  "{"detail":"The record was changed by another request at the same time. Reload and try again.","instance":"/api/requests/a2c8e787-294c-4093-824e-d5557446e2b6/revisions","status":409,"title":"Conflict","code":"CONCURRENT_MODIFICATION"}"
+Expecting actual:
+  "{"detail":"The record was changed by another request at the same time. Reload and try again.","instance":"/api/requests/4bfb02b0-b776-4c27-819c-4edfbaa60c92/revisions","status":409,"title":"Conflict","code":"CONCURRENT_MODIFICATION"}"
+[ERROR]   QuotesIT.acceptanceRacingANewRevisionNeverLetsBothSucceed:190 
+Expecting actual:
+  "{"detail":"The record was changed by another request at the same time. Reload and try again.","instance":"/api/requests/11a97b1b-f7ce-4a05-951a-6399e15d8a86/revisions","status":409,"title":"Conflict","code":"CONCURRENT_MODIFICATION"}"
+[ERROR]   QuotesIT.acceptanceRacingANewRevisionNeverLetsBothSucceed:190 
+Expecting actual:
+  "{"detail":"The record was changed by another request at the same time. Reload and try again.","instance":"/api/requests/b0632538-027e-489d-844c-b580e0d187f4/revisions","status":409,"title":"Conflict","code":"CONCURRENT_MODIFICATION"}"
+[ERROR]   QuotesIT.acceptanceRacingANewRevisionNeverLetsBothSucceed:190 
+Expecting actual:
+  "{"detail":"The record was changed by another request at the same time. Reload and try again.","instance":"/api/requests/838d32df-1693-45d2-97b2-c4baba351dc2/revisions","status":409,"title":"Conflict","code":"CONCURRENT_MODIFICATION"}"
+[ERROR]   QuotesIT.acceptanceRacingANewRevisionNeverLetsBothSucceed:190 
+Expecting actual:
+  "{"detail":"The record was changed by another request at the same time. Reload and try again.","instance":"/api/requests/a2c8e787-294c-4093-824e-d5557446e2b6/revisions","status":409,"title":"Conflict","code":"CONCURRENT_MODIFICATION"}"
+[ERROR]   QuotesIT.acceptanceRacingANewRevisionNeverLetsBothSucceed:190 
+Expecting actual:
+  "{"detail":"The record was changed by another request at the same time. Reload and try again.","instance":"/api/requests/4bfb02b0-b776-4c27-819c-4edfbaa60c92/revisions","status":409,"title":"Conflict","code":"CONCURRENT_MODIFICATION"}"

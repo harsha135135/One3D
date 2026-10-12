@@ -238,6 +238,10 @@ h2 {
 
 .badge-confirmed,
 .badge-accepted,
+.badge-verified,
+.badge-quoted,
+.badge-ordered,
+.badge-issued,
 .badge-completed,
 .badge-passed,
 .badge-ready-for-handoff,
@@ -248,6 +252,10 @@ h2 {
 
 .badge-awaiting-payment,
 .badge-awaiting-qc,
+.badge-submitted,
+.badge-changes-required,
+.badge-verifying,
+.badge-upload-pending,
 .badge-start-intent,
 .badge-reconciliation-required,
 .badge-occupied {
@@ -256,6 +264,9 @@ h2 {
 }
 
 .badge-failed,
+.badge-rejected,
+.badge-withdrawn,
+.badge-expired,
 .badge-rejected-before-start {
   border-color: var(--error);
   color: var(--error);
@@ -303,7 +314,10 @@ h2 {
 }
 
 select,
-input[type="text"] {
+input[type="text"],
+input[type="number"],
+input[type="file"],
+textarea {
   min-height: var(--target);
   padding: 0 10px;
   background: var(--page);
@@ -340,4 +354,40 @@ dl.facts dd {
   padding: 24px 16px;
   border-top: 1px solid var(--divider);
   font-size: 0.85rem;
+}
+
+/* Stacked forms (custom part request, quote). */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 560px;
+}
+
+.form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+textarea {
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+input[type="file"] {
+  padding: 8px 10px;
+}
+
+/* Long values such as SHA-256 digests wrap instead of widening the page. */
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.section {
+  margin-top: 24px;
 }

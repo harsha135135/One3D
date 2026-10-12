@@ -4,6 +4,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import store.one3d.background.BackgroundJob;
+import store.one3d.background.PendingWorkStore;
+import store.one3d.background.WorkKind;
 
 import java.time.Duration;
 import java.util.List;
@@ -19,7 +22,7 @@ import java.util.Optional;
  * its printer, and the row is retried with backoff; it never becomes a new attempt.
  */
 @Component
-public class DispatchWorker {
+public class DispatchWorker implements BackgroundJob {
 
     private static final Logger log = LoggerFactory.getLogger(DispatchWorker.class);
 
@@ -39,15 +42,16 @@ public class DispatchWorker {
         this.lease = lease;
     }
 
-    /** Claims due work and processes it. Returns the number of rows claimed. */
+    /** Claims due start deliveries and processes them. Returns the number of rows claimed. */
+    @Override
     public int runOnce() {
-        List<PendingWorkStore.ClaimedWork> claimed = work.claim(batchSize, lease);
+        List<PendingWorkStore.ClaimedWork> claimed = work.claim(WorkKind.DISPATCH_START, batchSize, lease);
         claimed.forEach(this::process);
         return claimed.size();
     }
 
     void process(PendingWorkStore.ClaimedWork claimed) {
-        SimulatorClient.StartRequest request = outcomes.startRequest(claimed.commandId());
+        SimulatorClient.StartRequest request = outcomes.startRequest(claimed.subjectId());
         DispatchResult result = deliver(request);
         outcomes.apply(claimed, result);
     }

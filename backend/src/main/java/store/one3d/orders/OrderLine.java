@@ -2,6 +2,8 @@ package store.one3d.orders;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -15,7 +17,8 @@ import store.one3d.catalog.CatalogSnapshot;
 import java.util.UUID;
 
 /**
- * The single line of an order: a snapshot of the catalog at order time.
+ * The single line of an order: a snapshot of the catalog, or of an accepted
+ * quote, at order time.
  * {@code @Immutable} tells Hibernate never to issue UPDATE statements for it.
  */
 @Entity
@@ -31,8 +34,14 @@ class OrderLine {
     @JoinColumn(name = "order_id")
     private CustomerOrder order;
 
+    @Enumerated(EnumType.STRING)
+    private LineSource source;
+
     @Column(name = "product_configuration_id")
     private UUID productConfigurationId;
+
+    @Column(name = "quote_id")
+    private UUID quoteId;
 
     @Column(name = "recipe_revision_id")
     private UUID recipeRevisionId;
@@ -62,6 +71,7 @@ class OrderLine {
 
     OrderLine(CustomerOrder order, CatalogSnapshot item, int quantity) {
         this.order = order;
+        this.source = LineSource.CATALOG;
         this.productConfigurationId = item.configurationId();
         this.recipeRevisionId = item.recipeRevisionId();
         this.productName = item.productName();
@@ -71,6 +81,29 @@ class OrderLine {
         this.quantity = quantity;
         this.unitPriceMinor = item.unitPriceMinor();
         this.currency = item.currency();
+    }
+
+    /** A line for an accepted quote: the quote and the exact recipe revision it priced. */
+    OrderLine(CustomerOrder order, QuotedItem item, int quantity) {
+        this.order = order;
+        this.source = LineSource.CUSTOM_QUOTE;
+        this.quoteId = item.quoteId();
+        this.recipeRevisionId = item.recipeRevisionId();
+        this.productName = item.itemName();
+        this.configurationCode = item.itemCode();
+        this.configurationDescription = item.itemDescription();
+        this.recipeRevisionNumber = item.recipeRevisionNumber();
+        this.quantity = quantity;
+        this.unitPriceMinor = item.unitPriceMinor();
+        this.currency = item.currency();
+    }
+
+    LineSource getSource() {
+        return source;
+    }
+
+    UUID getQuoteId() {
+        return quoteId;
     }
 
     UUID getProductConfigurationId() {

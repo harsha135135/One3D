@@ -1,0 +1,75 @@
+
+## 1. Sign in as two customers and an operator
+sign-in as customer-a: HTTP 302
+sign-in as customer-b: HTTP 302
+sign-in as operator-1: HTTP 302
+
+## 2. Customer A uploads the largest allowed model (straight to storage through :3000/s3)
+local file: 20971484 bytes, sha256 95657bb6bb57e895…
+presigned URL goes to: http://localhost:3000/s3/one3d-artifacts/uploads/<random id>
+signed query parameters: X-Amz-Algorithm X-Amz-Date X-Amz-SignedHeaders X-Amz-Credential X-Amz-Expires X-Amz-Signature 
+  PUT 20971484 bytes to storage: HTTP 200
+  finalize: {"status":"VERIFYING","pinnedVersion":"cee66a69-5f73-457c-b80f-1a5a1a7c6071"}
+after the check: {"status":"VERIFIED","sizeBytes":20971484,"sha256":"95657bb6bb57e895…"}
+sha256 matches the local file: yes
+
+## 3. Refusals: oversized declaration, wrong type, another customer's file
+declare 20971521 bytes: FILE_TOO_LARGE HTTP 400
+declare a .obj file: INVALID_FILE_NAME HTTP 400
+B finalizes A's file: FILE_NOT_FOUND HTTP 404
+B reads A's file: FILE_NOT_FOUND HTTP 404
+B downloads A's file: HTTP 404
+B submits A's file: FILE_NOT_FOUND HTTP 404
+  PUT 47 bytes to storage: HTTP 200
+  finalize: {"status":"VERIFYING","pinnedVersion":"54f877b5-2278-4903-aa43-0915b1cf183e"}
+HTML pretending to be STL: {"status":"REJECTED","rejectionReason":"Not a valid STL file: neither the binary layout nor the ASCII structure matches."}
+
+## 4. A sends a request with the checked file
+{"status":"SUBMITTED","revisions":[{"number":1,"material":"PETG","colour":"Orange","file":"big bracket.stl"}]}
+
+## 5. The operator downloads the exact file through :3000
+302 to a version-pinned link: yes
+  HTTP/1.1 200 OK
+  content-disposition: attachment; filename="big bracket.stl"
+  content-type: application/octet-stream
+downloaded sha256 equals the checked one: yes
+customer B on the operator route: ACCESS_DENIED HTTP 403
+
+## 6. The operator quotes revision 1
+{"status":"ISSUED","price":{"amountMinor":149900,"currency":"INR"},"expiresAt":"2026-10-17T16:57:00.246718Z","recipe":{"revisionNumber":1,"material":"PETG"}}
+
+## 7. A replaces the model: revision 2, review starts again, the quote is withdrawn
+  PUT 6084 bytes to storage: HTTP 200
+  finalize: {"status":"VERIFYING","pinnedVersion":"b858ab0f-4ff3-424d-ab5b-d6dc2f758537"}
+{"status":"SUBMITTED","revisions":[1,2]}
+quote for revision 1 now: {"status":"WITHDRAWN","acceptable":false}
+A accepts the withdrawn quote: QUOTE_WITHDRAWN HTTP 409
+operator quotes revision 1 again: REVISION_NOT_LATEST HTTP 409
+
+## 8. The operator quotes revision 2; B cannot accept it; A accepts it twice
+B accepts A's quote: QUOTE_NOT_FOUND HTTP 404
+first acceptance: {"id":"055f4699","status":"AWAITING_PAYMENT","line":{"source":"CUSTOM_QUOTE","productName":"Custom part: bracket v2.stl","configurationDescription":"PETG, Orange (revision 2)"},"total":{"amountMinor":159900,"currency":"INR"}}
+second acceptance returns the same order: yes
+orders for this quote: 1
+
+## 9. Accepted scope, from the order back to the stored file version
+quote | revision | number | material | colour | notes | recipe | material | layer µm | recipe notes | file | version | sha256
+337e3108 | 620b0b87 | 2 | PETG | Orange | Thicker base | 80a96be4 | PETG | 200 | 4 walls, 25% gyroid | c511493c | b858ab0f-4ff3-424d-ab5b-d6dc2f758537 | fad4c647852ac241
+A PUTs different bytes to the same key with the still-valid upload URL:
+  HTTP 200
+versions now stored for that key: 2
+accepted scope unchanged: yes
+A's download is still the checked version: yes
+
+## 10. The custom order is paid (demo) and released with the quote's recipe
+A pays (demo): {"status":"CONFIRMED","confirmationSource":"DEMO_SIMULATED"}
+job: {"status":"RELEASED","recipeRevisionId":"80a96be4"}
+job recipe is the accepted quote's recipe: yes
+
+## 11. An expired quote cannot be accepted
+  PUT 584 bytes to storage: HTTP 200
+  finalize: {"status":"VERIFYING","pinnedVersion":"af1d619a-d3d1-4162-8bd0-f2cd17c883c2"}
+(quote moved into the past with SQL)
+listed as: {"status":"ISSUED","expired":true,"acceptable":false}
+A accepts it: QUOTE_EXPIRED HTTP 409
+orders for that quote: 0

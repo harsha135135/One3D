@@ -1,0 +1,6 @@
+[ERROR] Tests run: 8, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 0.089 s <<< FAILURE! -- in store.one3d.files.StlCheckTest
+[ERROR]   StlCheckTest.aTruncatedBinaryModelFails:43 
+[ERROR]   StlCheckTest.textWithoutFacetsOrWithoutEndsolidFails:53 
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 10.77 s <<< FAILURE! -- in store.one3d.files.FilesIT
+java.lang.AssertionError: JSON path "$.status" expected:<REJECTED> but was:<VERIFIED>
+[ERROR]   FilesIT.contentThatIsNotAnStlModelIsRejected:105 JSON path "$.status" expected:<REJECTED> but was:<VERIFIED>

@@ -1,5 +1,5 @@
-# Local development services: PostgreSQL, the printer simulator and a mock
-# identity provider. The backend and frontend run on the host (see README).
+# Local development services: PostgreSQL, the printer simulator, a mock
+# identity provider and S3-compatible file storage. The backend and frontend run on the host (see README).
 # Checkpoint 7 adds the application containers and a deployment variant.
 services:
   db:
@@ -55,6 +55,39 @@ services:
     ports:
       - "127.0.0.1:8180:8080"
 
+  # Local stand-in for private S3 file storage (S3 on AWS). Files are kept in
+  # the one3d-storage volume. It does not check signatures, expiry or the signed
+  # Content-Length; real S3 does (verified on AWS in Checkpoint 7). The browser
+  # reaches it only through the frontend's /s3 path.
+  storage:
+    image: adobe/s3mock:5.2
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: one3d-artifacts
+      COM_ADOBE_TESTING_S3MOCK_STORE_ROOT: /s3mockroot
+      COM_ADOBE_TESTING_S3MOCK_STORE_RETAIN_FILES_ON_EXIT: "true"
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - one3d-storage:/s3mockroot
+
+  # One-shot setup: turn on bucket versioning, which the application requires
+  # (it pins the exact version of every upload). The application never creates
+  # or configures the bucket; on AWS, Terraform does.
+  storage-init:
+    image: curlimages/curl:8.17.0
+    depends_on:
+      - storage
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        until curl -sf -o /dev/null http://storage:9090/; do sleep 1; done;
+        curl -sf -X PUT 'http://storage:9090/one3d-artifacts?versioning'
+        -H 'Content-Type: application/xml'
+        -d '<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Status>Enabled</Status></VersioningConfiguration>'
+        && echo 'Bucket versioning enabled'
+
 volumes:
   one3d-db:
   one3d-simulator:
+  one3d-storage:

@@ -10,14 +10,20 @@ import java.util.Optional;
  */
 final class ConstraintConflicts {
 
-    private static final Map<String, String> CODES = Map.of(
-            "production_job_order_unique", "ALREADY_RELEASED",
-            "print_attempt_one_active_per_printer", "PRINTER_BUSY",
-            "print_attempt_one_active_per_job", "ATTEMPT_ALREADY_ACTIVE",
-            "print_attempt_number_unique", "CONCURRENT_MODIFICATION",
-            "bed_clearance_cleared_attempt_unique", "BED_ALREADY_CLEAR",
-            "bed_clearance_consumed_by_unique", "CONCURRENT_MODIFICATION",
-            "bed_clearance_one_open_per_printer", "CONCURRENT_MODIFICATION");
+    private static final Map<String, String> CODES = Map.ofEntries(
+            Map.entry("production_job_order_unique", "ALREADY_RELEASED"),
+            Map.entry("print_attempt_one_active_per_printer", "PRINTER_BUSY"),
+            Map.entry("print_attempt_one_active_per_job", "ATTEMPT_ALREADY_ACTIVE"),
+            Map.entry("print_attempt_number_unique", "CONCURRENT_MODIFICATION"),
+            Map.entry("bed_clearance_cleared_attempt_unique", "BED_ALREADY_CLEAR"),
+            Map.entry("bed_clearance_consumed_by_unique", "CONCURRENT_MODIFICATION"),
+            Map.entry("bed_clearance_one_open_per_printer", "CONCURRENT_MODIFICATION"),
+            Map.entry("submission_revision_artifact_unique", "FILE_ALREADY_SUBMITTED"),
+            Map.entry("submission_revision_number_unique", "CONCURRENT_MODIFICATION"),
+            Map.entry("quote_one_issued_per_request", "CONCURRENT_MODIFICATION"),
+            Map.entry("order_line_quote_unique", "QUOTE_ALREADY_ACCEPTED"),
+            Map.entry("quote_order_unique", "QUOTE_ALREADY_ACCEPTED"),
+            Map.entry("pending_work_one_per_artifact", "CONCURRENT_MODIFICATION"));
 
     private ConstraintConflicts() {
     }

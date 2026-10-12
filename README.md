@@ -45,19 +45,20 @@ These are planned choices, not claims of hands-on experience. The [scope](docs/v
 
 ## Run it locally
 
-These commands were run on 2026-10-07 and 2026-10-09; results are in the [Checkpoint 1](docs/evidence/2026-10-07-checkpoint-1.md), [2](docs/evidence/2026-10-09-checkpoint-2.md), [3](docs/evidence/2026-10-09-checkpoint-3.md) and [4](docs/evidence/2026-10-09-checkpoint-4.md) evidence.
+These commands were run between 2026-10-07 and 2026-10-10; results are in the [Checkpoint 1](docs/evidence/2026-10-07-checkpoint-1.md), [2](docs/evidence/2026-10-09-checkpoint-2.md), [3](docs/evidence/2026-10-09-checkpoint-3.md), [4](docs/evidence/2026-10-09-checkpoint-4.md) and [5](docs/evidence/2026-10-10-checkpoint-5.md) evidence.
 
 **Prerequisites:** JDK 21 (checked with 21.0.12; point `JAVA_HOME` at it if your default JDK differs), Node 24 LTS for the frontend (`frontend/.nvmrc`) and a running Docker daemon. Maven is not required: use the included `./mvnw` wrapper.
 
 ```bash
-# 1. Start PostgreSQL (127.0.0.1:5433), the printer simulator (127.0.0.1:8090)
-#    and the local mock identity provider (localhost:8180)
-docker compose up -d --build db simulator idp
+# 1. Start PostgreSQL (127.0.0.1:5433), the printer simulator (127.0.0.1:8090),
+#    the local mock identity provider (localhost:8180) and private file storage
+#    (S3Mock on 127.0.0.1:9090; storage-init switches on bucket versioning)
+docker compose up -d --build db simulator idp storage storage-init
 
 # 2. Run each test suite from its own directory
 (cd simulator && ./mvnw verify)   # simulator unit and HTTP tests
 (cd backend && ./mvnw verify)     # backend unit tests (Surefire) and integration tests
-                                  # (*IT, Failsafe; PostgreSQL and the simulator run as containers)
+                                  # (*IT, Failsafe; PostgreSQL, the simulator and S3Mock run as containers)
 (cd frontend && npm ci && npm run lint && npm run build && npm run typecheck \
    && npx playwright install chromium && npm run test:e2e)   # browser smoke tests, API mocked
 
@@ -69,9 +70,11 @@ docker compose up -d --build db simulator idp
 (cd frontend && npm ci && npm run dev)
 ```
 
-Sign in with **any username** on the mock provider's form. Usernames starting with `operator` (for example `operator-1`) get the operator role and the Operations pages; any other name is a customer. The frontend forwards `/api`, `/oauth2`, `/login` and `/logout` to the backend, so the session and CSRF cookies stay on one origin.
+Sign in with **any username** on the mock provider's form. Usernames starting with `operator` (for example `operator-1`) get the operator role and the Operations pages; any other name is a customer. The frontend forwards `/api`, `/oauth2`, `/login` and `/logout` to the backend, so the session and CSRF cookies stay on one origin. It also forwards `/s3` to the local storage, so the browser uploads and downloads model files with presigned URLs on the same origin (on AWS the browser talks to S3 directly).
 
-Every `/api` call except the catalog needs a signed-in session, and state-changing calls also need the `X-XSRF-TOKEN` header (the frontend handles both). Customers see only their own orders; `/api/ops/**` is for operators. The integration tests start their own PostgreSQL and simulator containers (the simulator image is built from `simulator/Dockerfile` on first use), so step 2 does not need step 1. A background worker in the backend delivers start commands to the simulator and polls running prints once per second. Stop the local services with `docker compose stop`; their data stays in the `one3d-db` and `one3d-simulator` volumes. The same suites run in GitHub Actions on every pull request.
+To try a custom part: open **Custom part**, choose an `.stl` file (at most 20 MB), and send it with a material and colour. Then sign in as an operator in another browser, open **Requests**, download the file, and send a quote. Accepting the quote creates an order that is paid (demo) and produced like a catalog order.
+
+Every `/api` call except the catalog needs a signed-in session, and state-changing calls also need the `X-XSRF-TOKEN` header (the frontend handles both). Customers see only their own orders, files and requests; `/api/ops/**` is for operators. The integration tests start their own PostgreSQL, simulator and S3Mock containers (the simulator image is built from `simulator/Dockerfile` on first use), so step 2 does not need step 1. A background worker in the backend delivers start commands to the simulator, polls running prints and checks uploaded files, once per second. Stop the local services with `docker compose stop`; their data stays in the `one3d-db`, `one3d-simulator` and `one3d-storage` volumes. The same suites run in GitHub Actions on every pull request.
 
 | Method and path | Purpose |
 |---|---|
@@ -82,7 +85,19 @@ Every `/api` call except the catalog needs a signed-in session, and state-changi
 | `GET /api/me` | Who is signed in, their roles, and whether the demo payment is enabled |
 | `POST /logout` | Sign out (204); the session ends on the server |
 
-Operator endpoints (Checkpoints 2–4), operators only:
+Custom parts (Checkpoint 5), for the signed-in customer:
+
+| Method and path | Purpose |
+|---|---|
+| `POST /api/files/uploads` | Start an upload: `{"filename": "part.stl", "sizeBytes": 123}` (an `.stl` name, 1 to 20,971,520 bytes) returns 201 with a presigned `PUT` URL and the headers to send. Larger declarations return 400 `FILE_TOO_LARGE` |
+| `POST /api/files/{id}/finalize` | After the PUT: checks the stored size and pins the exact stored version (`VERIFYING`); a background check then makes it `VERIFIED` (with its SHA-256) or `REJECTED` |
+| `GET /api/files/{id}`, `GET /api/files/{id}/download` | Your file's state; a redirect to a 5-minute link for the exact checked version, served as an attachment |
+| `POST /api/requests` | Submit a checked file with requirements: `{"artifactId": "…", "material": "PETG", "colour": "Orange", "notes": "…"}` |
+| `POST /api/requests/{id}/revisions` | A new file and requirements: review starts again and any open quote is withdrawn |
+| `GET /api/requests`, `GET /api/requests/{id}`, `GET /api/requests/{id}/quotes` | Your requests, one request with every revision, its quotes |
+| `POST /api/quotes/{id}/accept` | Create the order for an open, unexpired quote of the latest revision; accepting again returns the same order. Expired: 409 `QUOTE_EXPIRED`; withdrawn: 409 `QUOTE_WITHDRAWN` |
+
+Operator endpoints (Checkpoints 2–5), operators only:
 
 | Method and path | Purpose |
 |---|---|
@@ -94,7 +109,12 @@ Operator endpoints (Checkpoints 2–4), operators only:
 | `POST /api/ops/attempts/{id}/qc` | Whole-part inspection: `{"result": "PASSED" or "FAILED", "notes": "…"}` |
 | `POST /api/ops/printers/{id}/clear-bed` | Operator confirms the print was removed: `{"attemptId": "…"}`, which must be the printer's `bedCycleAttemptId`. Nothing clears the bed automatically; a clearance for an earlier print returns 409 `STALE_CLEARANCE` |
 | `POST /api/ops/attempts/{id}/reconcile` | Retry delivery that ran out of automatic tries (it re-checks the same command; it never starts a new attempt) |
-| `GET /api/ops/work?status=EXHAUSTED` | Delivery work that needs an operator |
+| `GET /api/ops/work?status=EXHAUSTED` | Background work that needs an operator: start deliveries and file checks whose tries ran out |
+| `POST /api/ops/files/{id}/retry-verification` | Try a file check again after its tries ran out |
+| `GET /api/ops/requests?status=SUBMITTED` | Custom requests by state, longest waiting first |
+| `GET /api/ops/requests/{id}`, `GET /api/ops/requests/{id}/revisions/{n}/file` | A request with every revision; a redirect to a 5-minute download link for revision n's exact file |
+| `POST /api/ops/requests/{id}/request-changes`, `/reject` | `{"message": "…"}` to the customer |
+| `POST /api/ops/requests/{id}/quotes` | Quote the latest revision: `{"revisionId", "priceMinor", "validDays" (1–14), "material", "layerHeightMicrons", "recipeNotes"}`; an open quote is withdrawn |
 | `POST /api/ops/orders/{id}/ready-for-handoff` | Only after the job's part passed QC |
 | `GET /api/ops/jobs/{id}`, `GET /api/ops/printers` | Job with all attempts; printer ownership and bed state |
 

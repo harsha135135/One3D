@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "@/components/Session";
 import { ErrorMessage, Loading, StatusBadge } from "@/components/States";
 import { ApiError, api, describeError } from "@/lib/api";
-import { formatMoney, formatTime, label } from "@/lib/format";
+import { formatMoney, formatTime, label, shortId } from "@/lib/format";
 import type { Order } from "@/lib/types";
 
 /** One of the customer's orders. Payment here is the demo-only simulation. */
@@ -58,8 +58,14 @@ export default function OrderPage() {
             <dd>
               <StatusBadge status={order.status} label={label(order.status)} />
             </dd>
-            <dt>Configuration</dt>
+            <dt>{order.line.source === "CUSTOM_QUOTE" ? "Requirements" : "Configuration"}</dt>
             <dd>{order.line.configurationDescription}</dd>
+            {order.line.source === "CUSTOM_QUOTE" && (
+              <>
+                <dt>From quote</dt>
+                <dd>{shortId(order.line.quoteId)}</dd>
+              </>
+            )}
             <dt>Quantity</dt>
             <dd>{order.line.quantity}</dd>
             <dt>Total</dt>

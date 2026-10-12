@@ -1,0 +1,4 @@
+             Body = {"detail":"Nothing has been uploaded for file 4a552ff0-aa37-47d5-8c1c-d3c6808ed780 yet.","instance":"/api/files/4a552ff0-aa37-47d5-8c1c-d3c6808ed780/finalize","status":409,"title":"Conflict","code":"UPLOAD_NOT_FOUND"}
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 11.15 s <<< FAILURE! -- in store.one3d.files.FilesIT
+java.lang.AssertionError: Status expected:<409> but was:<200>
+[ERROR]   FilesIT.finalizeChecksWhatWasActuallyStored:148 Status expected:<409> but was:<200>
