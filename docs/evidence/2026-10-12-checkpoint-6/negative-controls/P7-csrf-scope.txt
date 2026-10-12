@@ -1,0 +1,3 @@
+[ERROR]   SecurityIT.aStateChangingRequestWithoutTheCsrfTokenIsRefused:194 Status expected:<403> but was:<201>
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 11.84 s <<< FAILURE! -- in store.one3d.identity.SecurityIT
+java.lang.AssertionError: Status expected:<403> but was:<201>

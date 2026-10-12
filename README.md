@@ -45,7 +45,7 @@ These are planned choices, not claims of hands-on experience. The [scope](docs/v
 
 ## Run it locally
 
-These commands were run between 2026-10-07 and 2026-10-10; results are in the [Checkpoint 1](docs/evidence/2026-10-07-checkpoint-1.md), [2](docs/evidence/2026-10-09-checkpoint-2.md), [3](docs/evidence/2026-10-09-checkpoint-3.md), [4](docs/evidence/2026-10-09-checkpoint-4.md) and [5](docs/evidence/2026-10-10-checkpoint-5.md) evidence.
+These commands were run between 2026-10-07 and 2026-10-12; results are in the [Checkpoint 1](docs/evidence/2026-10-07-checkpoint-1.md), [2](docs/evidence/2026-10-09-checkpoint-2.md), [3](docs/evidence/2026-10-09-checkpoint-3.md), [4](docs/evidence/2026-10-09-checkpoint-4.md), [5](docs/evidence/2026-10-10-checkpoint-5.md) and [6](docs/evidence/2026-10-12-checkpoint-6.md) evidence.
 
 **Prerequisites:** JDK 21 (checked with 21.0.12; point `JAVA_HOME` at it if your default JDK differs), Node 24 LTS for the frontend (`frontend/.nvmrc`) and a running Docker daemon. Maven is not required: use the included `./mvnw` wrapper.
 
@@ -62,9 +62,15 @@ docker compose up -d --build db simulator idp storage storage-init
 (cd frontend && npm ci && npm run lint && npm run build && npm run typecheck \
    && npx playwright install chromium && npm run test:e2e)   # browser smoke tests, API mocked
 
-# 3. Start the API on http://127.0.0.1:8080 with the demo-only simulated
-#    payment (needed to walk an order through production before Checkpoint 6)
+# 3. Start the API on http://127.0.0.1:8080 in ONE of two payment modes:
+#    a) Razorpay TEST MODE: put RAZORPAY_KEY_ID (rzp_test_...), RAZORPAY_KEY_SECRET
+#       and RAZORPAY_WEBHOOK_SECRET in the untracked .env, then export them
+#       (they are read from the environment; never pass them as -D flags)
+(cd backend && set -a && . ../.env && set +a && ONE3D_RAZORPAY_ENABLED=true ./mvnw spring-boot:run)
+#    b) without keys: the demo-only shortcut confirms orders without payment
 (cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=demo)
+#    The two cannot be combined: startup fails if the demo profile is used with
+#    Razorpay enabled, or if a key id is not a test-mode key.
 
 # 4. In another terminal, start the frontend and open http://localhost:3000
 (cd frontend && npm ci && npm run dev)
@@ -72,7 +78,9 @@ docker compose up -d --build db simulator idp storage storage-init
 
 Sign in with **any username** on the mock provider's form. Usernames starting with `operator` (for example `operator-1`) get the operator role and the Operations pages; any other name is a customer. The frontend forwards `/api`, `/oauth2`, `/login` and `/logout` to the backend, so the session and CSRF cookies stay on one origin. It also forwards `/s3` to the local storage, so the browser uploads and downloads model files with presigned URLs on the same origin (on AWS the browser talks to S3 directly).
 
-To try a custom part: open **Custom part**, choose an `.stl` file (at most 20 MB), and send it with a material and colour. Then sign in as an operator in another browser, open **Requests**, download the file, and send a quote. Accepting the quote creates an order that is paid (demo) and produced like a catalog order.
+To try a custom part: open **Custom part**, choose an `.stl` file (at most 20 MB), and send it with a material and colour. Then sign in as an operator in another browser, open **Requests**, download the file, and send a quote. Accepting the quote creates an order that is paid and produced like a catalog order.
+
+To pay in Razorpay test mode: on the order page choose **Pay with Razorpay (test mode)**. In Razorpay's window use a test card from Razorpay's documentation (for example Visa `4100 2800 0000 1007`, any future expiry and CVV) and choose **Success** on its demo bank page. The order page then asks the backend, which checks with Razorpay; no real money moves. Webhooks cannot reach a local machine, so locally the backend's own check confirms the payment; on the deployed demo, Razorpay's webhook does too.
 
 Every `/api` call except the catalog needs a signed-in session, and state-changing calls also need the `X-XSRF-TOKEN` header (the frontend handles both). Customers see only their own orders, files and requests; `/api/ops/**` is for operators. The integration tests start their own PostgreSQL, simulator and S3Mock containers (the simulator image is built from `simulator/Dockerfile` on first use), so step 2 does not need step 1. A background worker in the backend delivers start commands to the simulator, polls running prints and checks uploaded files, once per second. Stop the local services with `docker compose stop`; their data stays in the `one3d-db`, `one3d-simulator` and `one3d-storage` volumes. The same suites run in GitHub Actions on every pull request.
 
@@ -95,15 +103,19 @@ Custom parts (Checkpoint 5), for the signed-in customer:
 | `POST /api/requests` | Submit a checked file with requirements: `{"artifactId": "…", "material": "PETG", "colour": "Orange", "notes": "…"}` |
 | `POST /api/requests/{id}/revisions` | A new file and requirements: review starts again and any open quote is withdrawn |
 | `GET /api/requests`, `GET /api/requests/{id}`, `GET /api/requests/{id}/quotes` | Your requests, one request with every revision, its quotes |
+| `POST /api/orders/{id}/checkout` | Razorpay test mode: open (or reuse) a checkout for exactly the order total; returns the public key id and Razorpay order id for Checkout. 409 `PAYMENT_WINDOW_CLOSED` after the order's payment window; 503 if Razorpay cannot be reached |
+| `POST /api/orders/{id}/payment-check` | Ask Razorpay (server-side) for the order's payments and record captured ones; the browser's own report is never used |
+| `GET /api/orders/{id}/timeline` | What has happened to your order, from recorded facts |
+| `POST /api/payments/razorpay/webhook` | **Razorpay only.** No session or CSRF token; accepted only with a valid `X-Razorpay-Signature` over the raw body and an `X-Razorpay-Event-Id` |
 | `POST /api/quotes/{id}/accept` | Create the order for an open, unexpired quote of the latest revision; accepting again returns the same order. Expired: 409 `QUOTE_EXPIRED`; withdrawn: 409 `QUOTE_WITHDRAWN` |
 
-Operator endpoints (Checkpoints 2–5), operators only:
+Operator endpoints (Checkpoints 2–6), operators only:
 
 | Method and path | Purpose |
 |---|---|
 | `GET /api/ops/orders?status=CONFIRMED` | Operator queue: orders by state, oldest first, each with its job |
 | `GET /api/ops/orders/{id}` | Any order, with its job |
-| `POST /api/demo/orders/{id}/simulate-payment` | **Demo profile only; customers, own order only.** Confirm an order without payment; the order records `confirmationSource: DEMO_SIMULATED` |
+| `POST /api/demo/orders/{id}/simulate-payment` | **Demo profile only (never together with Razorpay or on AWS); customers, own order only.** Confirm an order without payment; the order records `confirmationSource: DEMO_SIMULATED` and its timeline says no payment was taken |
 | `POST /api/ops/orders/{id}/release` | Create the order's production job (order must be `CONFIRMED`) |
 | `POST /api/ops/jobs/{id}/attempts` | Record the start of the next attempt: `{"printerId": "…"}`. The attempt is `START_INTENT` until the worker has delivered it and the simulator confirms (`RUNNING`). A lost reply makes it `RECONCILIATION_REQUIRED`; it keeps the printer until the simulator's journal answers. Needs a free printer with a cleared bed. At most 3 attempts per job, counting print failures and QC failures; starts the printer refused do not count; a 4th returns 409 `ATTEMPT_LIMIT_REACHED` |
 | `POST /api/ops/attempts/{id}/qc` | Whole-part inspection: `{"result": "PASSED" or "FAILED", "notes": "…"}` |
@@ -116,6 +128,8 @@ Operator endpoints (Checkpoints 2–5), operators only:
 | `POST /api/ops/requests/{id}/request-changes`, `/reject` | `{"message": "…"}` to the customer |
 | `POST /api/ops/requests/{id}/quotes` | Quote the latest revision: `{"revisionId", "priceMinor", "validDays" (1–14), "material", "layerHeightMicrons", "recipeNotes"}`; an open quote is withdrawn |
 | `POST /api/ops/orders/{id}/ready-for-handoff` | Only after the job's part passed QC |
+| `POST /api/ops/orders/{id}/handed-over` | The customer collected the part (only after ready for handoff) |
+| `GET /api/ops/payments`, `POST /api/ops/payments/{id}/resolve` | Captured payments that need a manual check (unknown order, wrong amount, late, or a second payment); record what was decided with `{"note": "…"}`. No money moves |
 | `GET /api/ops/jobs/{id}`, `GET /api/ops/printers` | Job with all attempts; printer ownership and bed state |
 
 The seeded printer `0d3d0000-0000-4000-8000-000000000101` is simulated by the separate `simulator/` process; no real printer is controlled. Its results (completion or failure) come from the simulator, not from this API. For local development the simulator has dev controls on 127.0.0.1:8090: `POST /dev/printers/{id}/complete`, `POST /dev/printers/{id}/fail` with `{"reason": "…"}`, and `POST /dev/printers/{id}/faults` with `{"dropNextStartAck": true}`. An invalid step returns 409 with a code such as `BED_NOT_CLEAR`, `PRINTER_BUSY` or `JOB_NOT_ACCEPTED`. Two operators acting at once get exactly one success and a 409.

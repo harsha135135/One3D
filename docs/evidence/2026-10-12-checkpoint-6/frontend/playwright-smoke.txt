@@ -1,0 +1,35 @@
+
+> one3d-frontend@0.1.0 test:e2e
+> playwright test
+
+
+Running 26 tests using 2 workers
+
+  ✓   1 [phone] › tests/smoke.spec.ts:95:5 › a signed-out visitor sees the catalog and is sent to sign in to order (281ms)
+  ✓   2 [desktop] › tests/smoke.spec.ts:95:5 › a signed-out visitor sees the catalog and is sent to sign in to order (280ms)
+  ✓   4 [desktop] › tests/smoke.spec.ts:105:5 › a customer orders and pays (demo) using only the keyboard, sending the CSRF header (250ms)
+  ✓   3 [phone] › tests/smoke.spec.ts:105:5 › a customer orders and pays (demo) using only the keyboard, sending the CSRF header (253ms)
+  ✓   5 [desktop] › tests/smoke.spec.ts:140:5 › an order that is not the customer's is shown as not found (169ms)
+  ✓   6 [phone] › tests/smoke.spec.ts:140:5 › an order that is not the customer's is shown as not found (168ms)
+  ✓   7 [desktop] › tests/smoke.spec.ts:151:5 › a customer does not get operator pages (131ms)
+  ✓   8 [phone] › tests/smoke.spec.ts:151:5 › a customer does not get operator pages (135ms)
+  ✓   9 [desktop] › tests/smoke.spec.ts:158:5 › the operator queue shows a refusal from the API as an alert (195ms)
+  ✓  10 [phone] › tests/smoke.spec.ts:158:5 › the operator queue shows a refusal from the API as an alert (193ms)
+  ✓  11 [desktop] › tests/smoke.spec.ts:176:5 › clearing a bed names the print that is on it (197ms)
+  ✓  12 [phone] › tests/smoke.spec.ts:176:5 › clearing a bed names the print that is on it (216ms)
+  ✓  14 [phone] › tests/smoke.spec.ts:252:5 › a customer uploads a model straight to storage, waits for the check and sends a request (1.5s)
+  ✓  13 [desktop] › tests/smoke.spec.ts:252:5 › a customer uploads a model straight to storage, waits for the check and sends a request (1.5s)
+  ✓  16 [desktop] › tests/smoke.spec.ts:311:5 › a file that is too large is refused before anything is uploaded (1.9s)
+  ✓  15 [phone] › tests/smoke.spec.ts:311:5 › a file that is too large is refused before anything is uploaded (1.9s)
+  ✓  18 [phone] › tests/smoke.spec.ts:324:5 › a customer accepts an open quote and goes to the new order; an expired quote has no button (224ms)
+  ✓  17 [desktop] › tests/smoke.spec.ts:324:5 › a customer accepts an open quote and goes to the new order; an expired quote has no button (309ms)
+  ✓  19 [phone] › tests/smoke.spec.ts:352:5 › an operator quotes the latest revision in rupees (255ms)
+  ✓  20 [desktop] › tests/smoke.spec.ts:352:5 › an operator quotes the latest revision in rupees (257ms)
+  ✓  21 [phone] › tests/smoke.spec.ts:391:5 › a customer pays in Razorpay test mode and the page asks the backend, not the browser (352ms)
+  ✓  22 [desktop] › tests/smoke.spec.ts:391:5 › a customer pays in Razorpay test mode and the page asks the backend, not the browser (358ms)
+  ✓  23 [phone] › tests/smoke.spec.ts:444:5 › the customer timeline shows each step through to handoff (146ms)
+  ✓  24 [desktop] › tests/smoke.spec.ts:444:5 › the customer timeline shows each step through to handoff (148ms)
+  ✓  25 [phone] › tests/smoke.spec.ts:475:5 › an operator records a checked payment with a note (239ms)
+  ✓  26 [desktop] › tests/smoke.spec.ts:475:5 › an operator records a checked payment with a note (234ms)
+
+  26 passed (7.6s)

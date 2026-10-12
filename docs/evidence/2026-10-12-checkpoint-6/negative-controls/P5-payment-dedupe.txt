@@ -1,0 +1,6 @@
+[ERROR]   CheckoutIT.aPaymentCheckRecordsACapturedPaymentTheProviderReports:132 No value at JSON path "$.outcome"
+[ERROR]   RazorpayWebhookIT.orderPaidForAnAlreadyRecordedPaymentChangesNothing:173 No value at JSON path "$.outcome"
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.060 s <<< FAILURE! -- in store.one3d.payments.RazorpayWebhookIT
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 11.85 s <<< FAILURE! -- in store.one3d.payments.CheckoutIT
+]; ERROR: duplicate key value violates unique constraint "payment_provider_payment_unique"
+Caused by: org.postgresql.util.PSQLException: ERROR: duplicate key value violates unique constraint "payment_provider_payment_unique"

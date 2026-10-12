@@ -1,0 +1,2 @@
+[ERROR]   PaymentModeGuardTest.theDemoShortcutTogetherWithRazorpayDoesNotStart:46->lambda$theDemoShortcutTogetherWithRazorpayDoesNotStart$4:46 
+[ERROR] Tests run: 6, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.339 s <<< FAILURE! -- in store.one3d.payments.PaymentModeGuardTest
