@@ -14,6 +14,8 @@ public record OrderResponse(
         Instant confirmedAt,
         ConfirmationSource confirmationSource,
         Instant readyForHandoffAt,
+        Instant handedOverAt,
+        Instant paymentWindowEndsAt,
         Line line,
         Money total) {
 
@@ -44,6 +46,8 @@ public record OrderResponse(
                 order.getConfirmedAt(),
                 order.getConfirmationSource(),
                 order.getReadyForHandoffAt(),
+                order.getHandedOverAt(),
+                order.getPaymentWindowEndsAt(),
                 new Line(
                         line.getSource(),
                         line.getProductConfigurationId(),

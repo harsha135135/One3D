@@ -8,7 +8,7 @@ import { formatMoney, formatTime, label, shortId } from "@/lib/format";
 import type { Page, QueueItem, Work } from "@/lib/types";
 import { OpsGuard } from "./OpsGuard";
 
-const FILTERS = ["CONFIRMED", "READY_FOR_HANDOFF", "AWAITING_PAYMENT"] as const;
+const FILTERS = ["CONFIRMED", "READY_FOR_HANDOFF", "AWAITING_PAYMENT", "HANDED_OVER"] as const;
 
 /** The operator queue: orders by state with their production jobs. */
 export default function OperationsPage() {
@@ -139,6 +139,18 @@ function Queue() {
                         onClick={() => act(() => api.release(order.id), `Order ${shortId(order.id)} released.`)}
                       >
                         Release
+                      </button>
+                    )}
+                    {order.status === "READY_FOR_HANDOFF" && (
+                      <button
+                        type="button"
+                        className="button"
+                        disabled={busy}
+                        onClick={() =>
+                          act(() => api.handedOver(order.id), `Order ${shortId(order.id)} recorded as handed over.`)
+                        }
+                      >
+                        Handed over
                       </button>
                     )}
                     {order.status === "CONFIRMED" && jobStatus === "ACCEPTED" && (

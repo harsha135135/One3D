@@ -1,0 +1,90 @@
+
+## 1. Sign in as two customers and an operator
+sign-in as cp6-customer-a-1791783291: HTTP 302
+sign-in as cp6-customer-b-1791783291: HTTP 302
+sign-in as operator-cp6-1791783291: HTTP 302
+payment mode for A: RAZORPAY_TEST
+demo shortcut in this mode: HTTP 404
+
+## 2. A orders from the catalog and opens a test-mode checkout (a real Razorpay order)
+{"providerOrderId":"order_TmsosmlLGTZWRp","keyId":"rzp_test_…","amountMinor":49900,"currency":"INR","testMode":true,"expiresAt":"2026-10-12T05:49:52.154270Z"}
+opening again reuses it: yes
+B opens a checkout for A's order: ORDER_NOT_FOUND HTTP 404
+B asks about A's payment: ORDER_NOT_FOUND HTTP 404
+A asks before paying (the backend asks Razorpay): {"orderStatus":"AWAITING_PAYMENT","newlyRecorded":0}
+
+## 3. A pays in Razorpay's hosted Checkout (test card, test bank page)
+  checkout: Opened Razorpay Checkout from the order page
+  checkout: Entered a dummy contact number
+  checkout: Entered Razorpay's documented test card (Visa 4100 2800 0000 1007), a future expiry and a random CVV
+  checkout: Dismissed prompt: /Maybe later/i
+  checkout: BANK URL: https://api.razorpay.com/v1/gateway/mocksharp/payment
+  checkout: This is just a demo bank page.
+  checkout: You can choose whether to make this payment successful or not:
+  checkout: 
+  checkout: 
+  checkout: Success Failure
+  checkout: Chose Success on Razorpay's test bank page (test mode only; no real bank)
+  checkout: Back on the order page: Payment received. Your order is confirmed.
+order: {"status":"CONFIRMED","confirmationSource":"RAZORPAY_TEST"}
+payment: pay_Tmsp47E5of56nc | order_TmsosmlLGTZWRp | RECONCILIATION | APPLIED | 49900 INR
+production job after payment alone: {"jobId":null}
+
+## 4. Webhook checks on the running server (events signed locally with the configured secret)
+no signature: INVALID_SIGNATURE HTTP 400
+signed with another secret: INVALID_SIGNATURE HTTP 400
+the real payment, reported again by a webhook: ALREADY_RECORDED
+the same event delivered twice: ALREADY_RECORDED
+payment.authorized for another payment: IGNORED
+a second, distinct captured payment for the paid order: NEEDS_REVIEW
+payments recorded for the order: APPLIED, NEEDS_REVIEW:SECOND_PAYMENT
+a captured payment of the wrong amount for another order: NEEDS_REVIEW, that order is still AWAITING_PAYMENT
+a captured payment for a Razorpay order that is not ours: NEEDS_REVIEW
+GET on the webhook path: HTTP 401
+
+## 5. The operator sees what needs a manual check and records a decision
+  pay_cp6unknow… UNKNOWN_PROVIDER_ORDER
+  pay_cp6amount… AMOUNT_MISMATCH
+  pay_cp6second… SECOND_PAYMENT
+resolve the second payment: 0 open reviews left for it
+a customer on the operator route: ACCESS_DENIED HTTP 403
+
+## 6. A custom part: upload, request, quote, accept, pay in Checkout
+custom order: {"status":"AWAITING_PAYMENT","item":"Custom part: wall hook.stl","total":34900,"payBy":"2026-10-15T05:35:27.978467Z"}, quote valid until 2026-10-15T05:35:27.978467Z
+  checkout: Opened Razorpay Checkout from the order page
+  checkout: Entered a dummy contact number
+  checkout: Entered Razorpay's documented test card (Visa 4100 2800 0000 1007), a future expiry and a random CVV
+  checkout: Dismissed prompt: /Maybe later/i
+  checkout: BANK URL: https://api.razorpay.com/v1/gateway/mocksharp/payment
+  checkout: This is just a demo bank page.
+  checkout: You can choose whether to make this payment successful or not:
+  checkout: 
+  checkout: 
+  checkout: Success Failure
+  checkout: Chose Success on Razorpay's test bank page (test mode only; no real bank)
+  checkout: Back on the order page: Payment received. Your order is confirmed.
+custom order: {"status":"CONFIRMED","confirmationSource":"RAZORPAY_TEST"}
+
+## 7. Both orders through the same production workflow
+  catalog order: released, attempt RUNNING on the simulator
+  catalog order: QC ACCEPTED, ready: READY_FOR_HANDOFF, handed over: HANDED_OVER
+  custom order: operator clears the bed of the previous print: CLEAR
+  custom order: released, attempt RUNNING on the simulator
+  custom order: QC ACCEPTED, ready: READY_FOR_HANDOFF, handed over: HANDED_OVER
+
+## 8. The customer's timelines
+Hex Desk Organizer (demo):
+  PLACED
+  CONFIRMED (Paid with Razorpay test mode (payment pay_…))
+  PAYMENT_UNDER_REVIEW (An extra payment was received and is being checked)
+  RELEASED_TO_PRODUCTION
+  QC_PASSED
+  READY_FOR_HANDOFF
+  HANDED_OVER
+Custom part: wall hook.stl:
+  PLACED (From quote d5f2cdcb)
+  CONFIRMED (Paid with Razorpay test mode (payment pay_…))
+  RELEASED_TO_PRODUCTION
+  QC_PASSED
+  READY_FOR_HANDOFF
+  HANDED_OVER

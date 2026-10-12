@@ -38,6 +38,13 @@ public class TestcontainersConfiguration {
         return new SimulatorRig();
     }
 
+    /** Replaces Razorpay: tests never call the real provider. */
+    @Bean
+    @Primary
+    FakeRazorpay fakeRazorpay() {
+        return new FakeRazorpay();
+    }
+
     @Bean
     StorageRig storageRig() {
         return new StorageRig();

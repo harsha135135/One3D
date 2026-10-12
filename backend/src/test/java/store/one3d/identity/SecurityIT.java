@@ -16,6 +16,7 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import store.one3d.support.PostgresIntegrationTest;
+import store.one3d.support.RazorpayEvents;
 import store.one3d.support.TestUsers;
 
 import java.util.ArrayList;
@@ -44,6 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SecurityIT {
 
     private static final String DEMO_CONFIGURATION = "0d3d0000-0000-4000-8000-000000000002";
+    private static final String WEBHOOK = "/api/payments/razorpay/webhook";
 
     @Autowired
     MockMvc mvc;
@@ -71,13 +73,18 @@ class SecurityIT {
      * added later cannot be left open by mistake.
      */
     @Test
-    void everyApiRouteNeedsSignInExceptTheCatalog() throws Exception {
+    void everyApiRouteNeedsSignInExceptTheCatalogAndTheSignedWebhook() throws Exception {
         List<String> checked = new ArrayList<>();
         for (Route route : apiRoutes()) {
             MvcResult result = mvc.perform(route.toRequest().with(anonymous())).andReturn();
             boolean publicRoute = route.method() == HttpMethod.GET && route.pattern().startsWith("/api/catalog/");
+            boolean webhook = route.method() == HttpMethod.POST && route.pattern().equals(WEBHOOK);
             if (publicRoute) {
                 assertThat(result.getResponse().getStatus()).as(route.toString()).isNotEqualTo(401);
+            } else if (webhook) {
+                // Open without a session, but only with Razorpay's signature.
+                assertThat(result.getResponse().getStatus()).as(route.toString()).isEqualTo(400);
+                assertThat(result.getResponse().getContentAsString()).contains("INVALID_SIGNATURE");
             } else {
                 assertThat(result.getResponse().getStatus()).as(route.toString()).isEqualTo(401);
                 assertThat(result.getResponse().getContentAsString()).as(route.toString()).contains("UNAUTHENTICATED");
@@ -120,7 +127,9 @@ class SecurityIT {
         mvc.perform(get("/api/orders").with(TestUsers.customer(customerB)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[?(@.id == '" + orderOfA + "')]").isEmpty());
-        mvc.perform(post("/api/demo/orders/" + orderOfA + "/simulate-payment").with(TestUsers.customer(customerB)))
+        mvc.perform(post("/api/orders/" + orderOfA + "/checkout").with(TestUsers.customer(customerB)))
+                .andExpect(status().isNotFound());
+        mvc.perform(post("/api/orders/" + orderOfA + "/payment-check").with(TestUsers.customer(customerB)))
                 .andExpect(status().isNotFound());
         mvc.perform(get("/api/orders/" + orderOfA).with(TestUsers.customer(customerA)))
                 .andExpect(jsonPath("$.status").value("AWAITING_PAYMENT"));
@@ -186,6 +195,33 @@ class SecurityIT {
                 .andExpect(jsonPath("$.code").value("CSRF_TOKEN_INVALID"));
         bare.perform(placeOrder().with(TestUsers.customer(customerA)).with(csrf()))
                 .andExpect(status().isCreated());
+    }
+
+    /**
+     * Only POST to the webhook skips the session and the CSRF token, and it
+     * still needs a valid signature. Other methods on that path are not open.
+     */
+    @Test
+    void onlyTheSignedWebhookIsExemptFromSessionAndCsrf() throws Exception {
+        MockMvc bare = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+        String failed = RazorpayEvents.event("payment.failed", RazorpayEvents.newPaymentId(), "order_unknown", 100,
+                "INR", "failed", java.time.Instant.now());
+
+        bare.perform(post(WEBHOOK).contentType(MediaType.APPLICATION_JSON).content(failed))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_SIGNATURE"));
+        bare.perform(post(WEBHOOK).contentType(MediaType.APPLICATION_JSON).content(failed)
+                        .header("X-Razorpay-Event-Id", RazorpayEvents.newEventId())
+                        .header("X-Razorpay-Signature", RazorpayEvents.sign(failed)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.outcome").value("IGNORED"));
+        bare.perform(request(HttpMethod.PUT, WEBHOOK).contentType(MediaType.APPLICATION_JSON).content(failed))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CSRF_TOKEN_INVALID"));
+        bare.perform(request(HttpMethod.PUT, WEBHOOK).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(failed))
+                .andExpect(status().isUnauthorized());
+        bare.perform(get(WEBHOOK)).andExpect(status().isUnauthorized());
+        // Every other mutation still needs the CSRF token (see the test above).
     }
 
     // --- helpers -------------------------------------------------------------

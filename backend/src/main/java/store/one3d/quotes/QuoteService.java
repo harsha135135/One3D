@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import store.one3d.catalog.RecipeService;
 import store.one3d.catalog.RecipeSnapshot;
+import store.one3d.common.ConflictException;
 import store.one3d.common.NotFoundException;
 import store.one3d.common.Timestamps;
 import store.one3d.orders.OrderResponse;
@@ -34,6 +35,11 @@ public class QuoteService {
     private static final String NAME_PREFIX = "Custom part: ";
     /** order_line.product_name is varchar(120). */
     private static final int MAX_ITEM_NAME = 120;
+    /**
+     * The order's payment window ends with the quote, so a quote accepted later
+     * than this before its expiry would create an order that cannot be paid.
+     */
+    static final Duration MIN_TIME_TO_PAY = Duration.ofMinutes(15);
 
     private final QuoteRepository quotes;
     private final RequestService requests;
@@ -88,6 +94,10 @@ public class QuoteService {
         }
         Instant now = Timestamps.now();
         quote.requireAcceptable(now);
+        if (quote.getExpiresAt().isBefore(now.plus(MIN_TIME_TO_PAY))) {
+            throw new ConflictException("QUOTE_EXPIRING", "Quote " + quoteId + " expires at " + quote.getExpiresAt()
+                    + ", too soon to pay for it. Ask for a new quote.");
+        }
         QuotableRevision revision = requests.requireAwaitingAcceptance(requestId, quote.getRevisionId());
         RecipeSnapshot recipe = recipes.forQuote(quoteId).orElseThrow();
 
@@ -99,7 +109,8 @@ public class QuoteService {
                 "CUSTOM-" + quote.getId().toString().substring(0, 8),
                 revision.material() + ", " + revision.colour() + " (revision " + revision.revisionNumber() + ")",
                 quote.getPriceMinor(),
-                quote.getCurrency()));
+                quote.getCurrency(),
+                quote.getExpiresAt()));
         quote.accept(order.id(), now);
         requests.markOrdered(requestId);
         return order;

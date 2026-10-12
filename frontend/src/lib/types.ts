@@ -2,7 +2,14 @@
 
 export type Money = { amountMinor: number; currency: string };
 
-export type Me = { id: string; email: string | null; roles: string[]; demoPaymentEnabled: boolean };
+/** paymentMode: RAZORPAY_TEST (hosted test-mode checkout), DEMO (shortcut, no payment) or NONE. */
+export type Me = {
+  id: string;
+  email: string | null;
+  roles: string[];
+  demoPaymentEnabled: boolean;
+  paymentMode: "RAZORPAY_TEST" | "DEMO" | "NONE";
+};
 
 export type CatalogItem = {
   configurationId: string;
@@ -13,7 +20,7 @@ export type CatalogItem = {
   recipeRevisionNumber: number;
 };
 
-export type OrderStatus = "AWAITING_PAYMENT" | "CONFIRMED" | "READY_FOR_HANDOFF";
+export type OrderStatus = "AWAITING_PAYMENT" | "CONFIRMED" | "READY_FOR_HANDOFF" | "HANDED_OVER";
 
 export type Order = {
   id: string;
@@ -23,6 +30,8 @@ export type Order = {
   confirmedAt: string | null;
   confirmationSource: string | null;
   readyForHandoffAt: string | null;
+  handedOverAt: string | null;
+  paymentWindowEndsAt: string;
   line: {
     /** CATALOG lines have a productConfigurationId; CUSTOM_QUOTE lines a quoteId. */
     source: "CATALOG" | "CUSTOM_QUOTE";
@@ -179,4 +188,48 @@ export type IssueQuote = {
   material: string;
   layerHeightMicrons: number;
   recipeNotes: string;
+};
+
+export type TimelineEntry = {
+  kind:
+    | "PLACED"
+    | "CONFIRMED"
+    | "PAYMENT_UNDER_REVIEW"
+    | "RELEASED_TO_PRODUCTION"
+    | "QC_PASSED"
+    | "READY_FOR_HANDOFF"
+    | "HANDED_OVER";
+  occurredAt: string;
+  detail: string | null;
+};
+
+/** What Razorpay Checkout needs; the key id is public, the secret never leaves the server. */
+export type Checkout = {
+  checkoutId: string;
+  orderId: string;
+  keyId: string;
+  providerOrderId: string;
+  amountMinor: number;
+  currency: string;
+  expiresAt: string;
+  itemName: string;
+  testMode: boolean;
+};
+
+export type PaymentCheck = { orderStatus: OrderStatus; newlyRecorded: number };
+
+export type PaymentRecord = {
+  id: string;
+  providerPaymentId: string;
+  providerOrderId: string;
+  orderId: string | null;
+  amountMinor: number;
+  currency: string;
+  providerCreatedAt: string;
+  recordedAt: string;
+  source: "WEBHOOK" | "RECONCILIATION";
+  outcome: "APPLIED" | "NEEDS_REVIEW";
+  reviewReason: "UNKNOWN_PROVIDER_ORDER" | "AMOUNT_MISMATCH" | "LATE_PAYMENT" | "SECOND_PAYMENT" | null;
+  resolvedAt: string | null;
+  resolutionNote: string | null;
 };

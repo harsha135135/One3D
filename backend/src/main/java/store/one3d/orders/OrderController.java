@@ -14,6 +14,7 @@ import store.one3d.common.PageResponse;
 import store.one3d.identity.CurrentUser;
 
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -52,5 +53,11 @@ class OrderController {
     @GetMapping("/{orderId}")
     OrderResponse getOrder(@PathVariable UUID orderId) {
         return orderService.getOwnOrder(currentUser.id(), orderId);
+    }
+
+    /** What has happened to the order so far, oldest first. */
+    @GetMapping("/{orderId}/timeline")
+    List<TimelineEntry> timeline(@PathVariable UUID orderId) {
+        return orderService.ownTimeline(currentUser.id(), orderId);
     }
 }

@@ -1,0 +1,6 @@
+Opened Razorpay Checkout from the order page
+Entered a dummy contact number
+Entered Razorpay's documented test card (Visa 4100 2800 0000 1007), a future expiry and a random CVV
+Dismissed prompt: /Maybe later/i
+Chose Success on Razorpay's test bank page (test mode only; no real bank)
+Back on the order page: Payment received. Your order is confirmed.

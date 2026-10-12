@@ -233,7 +233,9 @@ class CustomOrderConstraintsIT {
 
     private UUID newOrder() {
         UUID id = UUID.randomUUID();
-        jdbc.sql("INSERT INTO customer_order (id, customer_id, status, created_at) VALUES (?, ?, 'AWAITING_PAYMENT', now())")
+        jdbc.sql("""
+                        INSERT INTO customer_order (id, customer_id, status, created_at, payment_window_ends_at)
+                        VALUES (?, ?, 'AWAITING_PAYMENT', now(), now() + interval '72 hours')""")
                 .params(id, TestUsers.LEGACY_CUSTOMER_ID).update();
         return id;
     }

@@ -18,8 +18,12 @@ function order(status: string) {
     confirmedAt: status === "AWAITING_PAYMENT" ? null : "2026-10-09T08:01:00Z",
     confirmationSource: status === "AWAITING_PAYMENT" ? null : "DEMO_SIMULATED",
     readyForHandoffAt: null,
+    handedOverAt: null,
+    paymentWindowEndsAt: "2099-01-01T00:00:00Z",
     line: {
+      source: "CATALOG",
       productConfigurationId: "cfg-1",
+      quoteId: null,
       productName: ITEM.productName,
       configurationCode: ITEM.configurationCode,
       configurationDescription: ITEM.description,
@@ -32,8 +36,21 @@ function order(status: string) {
   };
 }
 
-const CUSTOMER = { id: "c-1", email: "customer@example.test", roles: ["CUSTOMER"], demoPaymentEnabled: true };
-const OPERATOR = { id: "o-1", email: "operator@example.test", roles: ["CUSTOMER", "OPERATOR"], demoPaymentEnabled: true };
+const CUSTOMER = {
+  id: "c-1",
+  email: "customer@example.test",
+  roles: ["CUSTOMER"],
+  demoPaymentEnabled: true,
+  paymentMode: "DEMO",
+};
+const OPERATOR = {
+  id: "o-1",
+  email: "operator@example.test",
+  roles: ["CUSTOMER", "OPERATOR"],
+  demoPaymentEnabled: false,
+  paymentMode: "RAZORPAY_TEST",
+};
+const RAZORPAY_CUSTOMER = { ...CUSTOMER, demoPaymentEnabled: false, paymentMode: "RAZORPAY_TEST" };
 
 type Handler = (route: Route) => Promise<void> | void;
 
@@ -96,6 +113,7 @@ test("a customer orders and pays (demo) using only the keyboard, sending the CSR
       return r.fulfill({ status: 201, json: current });
     },
     [`GET /api/orders/${current.id}`]: (r) => r.fulfill({ json: current }),
+    [`GET /api/orders/${current.id}/timeline`]: (r) => r.fulfill({ json: [] }),
     [`POST /api/demo/orders/${current.id}/simulate-payment`]: (r) => {
       csrfHeaders.push(r.request().headers()["x-xsrf-token"]);
       current = order("CONFIRMED");
@@ -122,6 +140,8 @@ test("a customer orders and pays (demo) using only the keyboard, sending the CSR
 test("an order that is not the customer's is shown as not found", async ({ page }) => {
   await mockApi(page, CUSTOMER, {
     "GET /api/orders/someone-elses": (r) => r.fulfill({ status: 404, json: { code: "ORDER_NOT_FOUND", detail: "Not found" } }),
+    "GET /api/orders/someone-elses/timeline": (r) =>
+      r.fulfill({ status: 404, json: { code: "ORDER_NOT_FOUND", detail: "Not found" } }),
   });
   await page.goto("/orders/someone-elses");
 
@@ -314,6 +334,7 @@ test("a customer accepts an open quote and goes to the new order; an expired quo
       return r.fulfill({ json: created });
     },
     [`GET /api/orders/${created.id}`]: (r) => r.fulfill({ json: created }),
+    [`GET /api/orders/${created.id}/timeline`]: (r) => r.fulfill({ json: [] }),
   });
   await page.goto("/requests/req-1");
 
@@ -354,5 +375,134 @@ test("an operator quotes the latest revision in rupees", async ({ page }) => {
     layerHeightMicrons: 200,
     recipeNotes: "3 walls",
   });
+  await expectNoHorizontalScroll(page);
+});
+
+// --- payments and handoff (Checkpoint 6) -------------------------------------
+
+/** Stands in for checkout.razorpay.com: records the options and reports success at once. */
+const FAKE_CHECKOUT_SCRIPT = `
+  window.Razorpay = function (options) {
+    window.__razorpayOptions = options;
+    this.open = function () { setTimeout(function () { options.handler({ razorpay_payment_id: "pay_from_browser" }); }, 50); };
+    this.on = function () {};
+  };`;
+
+test("a customer pays in Razorpay test mode and the page asks the backend, not the browser", async ({ page, context }) => {
+  await context.addCookies([{ name: "XSRF-TOKEN", value: "csrf-123", url: "http://localhost:3100" }]);
+  let current = order("AWAITING_PAYMENT");
+  const checkHeaders: (string | undefined)[] = [];
+  await page.route("https://checkout.razorpay.com/v1/checkout.js", (route) =>
+    route.fulfill({ contentType: "application/javascript", body: FAKE_CHECKOUT_SCRIPT }),
+  );
+  await mockApi(page, RAZORPAY_CUSTOMER, {
+    [`GET /api/orders/${current.id}`]: (r) => r.fulfill({ json: current }),
+    [`GET /api/orders/${current.id}/timeline`]: (r) =>
+      r.fulfill({
+        json:
+          current.status === "CONFIRMED"
+            ? [
+                { kind: "PLACED", occurredAt: "2026-10-09T08:00:00Z", detail: null },
+                { kind: "CONFIRMED", occurredAt: "2026-10-09T08:01:00Z", detail: "Paid with Razorpay test mode" },
+              ]
+            : [{ kind: "PLACED", occurredAt: "2026-10-09T08:00:00Z", detail: null }],
+      }),
+    [`POST /api/orders/${current.id}/checkout`]: (r) =>
+      r.fulfill({
+        json: {
+          checkoutId: "chk-1",
+          orderId: current.id,
+          keyId: "rzp_test_public",
+          providerOrderId: "order_TEST123",
+          amountMinor: 49900,
+          currency: "INR",
+          expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+          itemName: ITEM.productName,
+          testMode: true,
+        },
+      }),
+    [`POST /api/orders/${current.id}/payment-check`]: (r) => {
+      checkHeaders.push(r.request().headers()["x-xsrf-token"]);
+      expect(r.request().postData() ?? "").not.toContain("pay_from_browser");
+      current = { ...order("CONFIRMED"), confirmationSource: "RAZORPAY_TEST" };
+      return r.fulfill({ json: { orderStatus: "CONFIRMED", newlyRecorded: 1 } });
+    },
+  });
+  await page.goto(`/orders/${current.id}`);
+
+  await page.getByRole("button", { name: "Pay ₹499.00 with Razorpay (test mode)" }).click();
+
+  await expect(page.getByText("Payment received. Your order is confirmed.")).toBeVisible();
+  await expect(page.locator("[data-status=CONFIRMED]")).toBeVisible();
+  await expect(page.getByText("Paid with Razorpay test mode")).toBeVisible();
+  const options = await page.evaluate(() => (window as unknown as { __razorpayOptions: Record<string, unknown> }).__razorpayOptions);
+  expect(options).toMatchObject({ key: "rzp_test_public", order_id: "order_TEST123", amount: 49900, currency: "INR" });
+  expect(checkHeaders).toEqual(["csrf-123"]);
+  await expectNoHorizontalScroll(page);
+});
+
+test("the customer timeline shows each step through to handoff", async ({ page }) => {
+  const done = { ...order("HANDED_OVER"), handedOverAt: "2026-10-10T12:00:00Z", readyForHandoffAt: "2026-10-10T09:00:00Z" };
+  await mockApi(page, RAZORPAY_CUSTOMER, {
+    [`GET /api/orders/${done.id}`]: (r) => r.fulfill({ json: done }),
+    [`GET /api/orders/${done.id}/timeline`]: (r) =>
+      r.fulfill({
+        json: [
+          { kind: "PLACED", occurredAt: "2026-10-09T08:00:00Z", detail: null },
+          { kind: "CONFIRMED", occurredAt: "2026-10-09T08:01:00Z", detail: "Paid with Razorpay test mode" },
+          { kind: "RELEASED_TO_PRODUCTION", occurredAt: "2026-10-09T09:00:00Z", detail: null },
+          { kind: "QC_PASSED", occurredAt: "2026-10-10T08:30:00Z", detail: null },
+          { kind: "READY_FOR_HANDOFF", occurredAt: "2026-10-10T09:00:00Z", detail: null },
+          { kind: "HANDED_OVER", occurredAt: "2026-10-10T12:00:00Z", detail: null },
+        ],
+      }),
+  });
+  await page.goto(`/orders/${done.id}`);
+
+  const steps = page.locator("ol.timeline li strong");
+  await expect(steps).toHaveText([
+    "Order placed",
+    "Confirmed",
+    "In production",
+    "Passed quality check",
+    "Ready for handoff",
+    "Handed over",
+  ]);
+  await expect(page.getByRole("button", { name: /Pay/ })).toHaveCount(0);
+  await expectNoHorizontalScroll(page);
+});
+
+test("an operator records a checked payment with a note", async ({ page }) => {
+  let body: unknown = null;
+  const review = {
+    id: "p-1",
+    providerPaymentId: "pay_SECOND",
+    providerOrderId: "order_TEST123",
+    orderId: "11111111-2222-4333-8444-555555555555",
+    amountMinor: 49900,
+    currency: "INR",
+    providerCreatedAt: "2026-10-10T08:00:00Z",
+    recordedAt: "2026-10-10T08:00:05Z",
+    source: "WEBHOOK",
+    outcome: "NEEDS_REVIEW",
+    reviewReason: "SECOND_PAYMENT",
+    resolvedAt: null,
+    resolutionNote: null,
+  };
+  await mockApi(page, OPERATOR, {
+    "GET /api/ops/payments": (r) => r.fulfill({ json: [review] }),
+    "POST /api/ops/payments/p-1/resolve": (r) => {
+      body = r.request().postDataJSON();
+      return r.fulfill({ json: [] });
+    },
+  });
+  await page.goto("/ops/payments");
+
+  await expect(page.getByText("The order was already paid")).toBeVisible();
+  await page.getByLabel("What was decided").fill("Refunded in the Razorpay dashboard");
+  await page.getByRole("button", { name: "Mark as checked" }).click();
+
+  await expect(page.getByText("No payments need a check.")).toBeVisible();
+  expect(body).toEqual({ note: "Refunded in the Razorpay dashboard" });
   await expectNoHorizontalScroll(page);
 });

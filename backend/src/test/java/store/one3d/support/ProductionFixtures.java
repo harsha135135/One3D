@@ -37,8 +37,9 @@ public final class ProductionFixtures {
         UUID orderId = UUID.randomUUID();
         OffsetDateTime confirmedAt = confirmationSource == null ? null : OffsetDateTime.now();
         jdbc.sql("""
-                        INSERT INTO customer_order (id, customer_id, status, created_at, confirmed_at, confirmation_source)
-                        VALUES (?, ?, ?, now(), ?, ?)
+                        INSERT INTO customer_order (id, customer_id, status, created_at, confirmed_at, confirmation_source,
+                                                    payment_window_ends_at)
+                        VALUES (?, ?, ?, now(), ?, ?, now() + interval '72 hours')
                         """)
                 .params(orderId, TestUsers.LEGACY_CUSTOMER_ID, status, confirmedAt, confirmationSource)
                 .update();

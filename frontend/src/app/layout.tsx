@@ -6,7 +6,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "One3D",
-  description: "Order a 3D-printed part and follow it through production. Demonstration: payments are simulated.",
+  description:
+    "Order a 3D-printed part and follow it through production. Demonstration: payments are in test mode, no real money.",
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, colorScheme: "dark" };
@@ -21,7 +22,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             {children}
           </main>
           <footer className="site-footer muted">
-            Demonstration system: payments are simulated and no real printer is controlled.
+            Demonstration system: payments are in test mode (no real money) and no real printer is controlled.
           </footer>
         </SessionProvider>
       </body>

@@ -29,7 +29,7 @@ class CustomerOrderTest {
 
     @Test
     void newOrderAwaitsPaymentAndCopiesTheCatalogValues() {
-        CustomerOrder order = CustomerOrder.place(CUSTOMER, ITEM, 1, NOW);
+        CustomerOrder order = CustomerOrder.place(CUSTOMER, ITEM, 1, NOW, NOW.plusSeconds(72 * 3600));
 
         assertThat(order.getCustomerId()).isEqualTo(CUSTOMER);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.AWAITING_PAYMENT);
@@ -48,15 +48,15 @@ class CustomerOrderTest {
 
     @Test
     void totalIsUnitPriceTimesQuantityInTheLineCurrency() {
-        assertThat(CustomerOrder.place(CUSTOMER, ITEM, 1, NOW).total()).isEqualTo(new Money(49_900, "INR"));
+        assertThat(CustomerOrder.place(CUSTOMER, ITEM, 1, NOW, NOW.plusSeconds(72 * 3600)).total()).isEqualTo(new Money(49_900, "INR"));
     }
 
     @Test
     void quantityOtherThanOneIsRejectedEvenIfRequestValidationIsBypassed() {
-        assertThatThrownBy(() -> CustomerOrder.place(CUSTOMER, ITEM, 2, NOW))
+        assertThatThrownBy(() -> CustomerOrder.place(CUSTOMER, ITEM, 2, NOW, NOW.plusSeconds(72 * 3600)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("quantity 1");
-        assertThatThrownBy(() -> CustomerOrder.place(CUSTOMER, ITEM, 0, NOW))
+        assertThatThrownBy(() -> CustomerOrder.place(CUSTOMER, ITEM, 0, NOW, NOW.plusSeconds(72 * 3600)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

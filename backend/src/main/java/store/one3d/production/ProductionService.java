@@ -8,6 +8,7 @@ import store.one3d.background.WorkKind;
 import store.one3d.common.ConflictException;
 import store.one3d.common.NotFoundException;
 import store.one3d.common.Timestamps;
+import store.one3d.orders.OrderFactKind;
 import store.one3d.orders.OrderResponse;
 import store.one3d.orders.OrderService;
 import store.one3d.orders.ReleasableOrder;
@@ -66,6 +67,7 @@ public class ProductionService {
         }
         ProductionJob job = jobs.saveAndFlush(
                 ProductionJob.release(order.orderId(), order.recipeRevisionId(), Timestamps.now()));
+        orderService.recordFact(orderId, OrderFactKind.RELEASED_TO_PRODUCTION, null);
         return JobResponse.from(job);
     }
 
@@ -106,6 +108,9 @@ public class ProductionService {
         PrintAttempt attempt = findAttempt(attemptId);
         ProductionJob job = attempt.getJob();
         job.recordQc(attempt, result, notes, Timestamps.now());
+        if (result == QcResult.PASSED) {
+            orderService.recordFact(job.getOrderId(), OrderFactKind.QC_PASSED, null);
+        }
         return JobResponse.from(job);
     }
 
@@ -134,6 +139,12 @@ public class ProductionService {
                 "JOB_NOT_ACCEPTED", "Order " + orderId + " has not been released for production."));
         job.requireAccepted();
         return orderService.markReadyForHandoff(orderId);
+    }
+
+    /** Handoff is an order step; it is here beside readiness so operators find both in one place. */
+    @Transactional
+    public OrderResponse markHandedOver(UUID orderId) {
+        return orderService.markHandedOver(orderId);
     }
 
     @Transactional(readOnly = true)
