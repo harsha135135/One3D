@@ -230,6 +230,18 @@ async function payPart(browser) {
   const order = await json(page, "POST", "/api/orders", { productConfigurationId: CONFIGURATION, quantity: 1 });
   fs.writeFileSync(`${OUT}/${part}-order-id.txt`, order.id + "\n");
   say(`placed order ${order.id.slice(0, 8)}: ${order.status}, ${order.total.amountMinor / 100} ${order.total.currency}`);
+  if (process.env.ONE3D_TRY_CSP_FROM) {
+    // Try a policy change on the live site before deploying it: the order page is served with the
+    // Content-Security-Policy from that Nginx template (the upload origin is taken from the live header).
+    const candidate = fs.readFileSync(process.env.ONE3D_TRY_CSP_FROM, "utf8").match(/Content-Security-Policy "([^"]+)"/)[1];
+    await page.route(`${SITE}/orders/**`, async (route) => {
+      const response = await route.fetch();
+      const origin = response.headers()["content-security-policy"].match(/connect-src 'self' (\S+)/)[1];
+      await route.fulfill({ response, headers: { ...response.headers(),
+        "content-security-policy": candidate.replace("${ONE3D_UPLOAD_ORIGIN}", origin) } });
+    });
+    say(`the order page is served with the policy in ${path.basename(path.dirname(process.env.ONE3D_TRY_CSP_FROM))}/${path.basename(process.env.ONE3D_TRY_CSP_FROM)}, not the deployed one`);
+  }
   await visit(page, `/orders/${order.id}`);
   await page.getByRole("button", { name: /with Razorpay \(test mode\)/ }).click();
   const frame = await (await page.waitForSelector("iframe.razorpay-checkout-frame", { timeout: 30000 })).contentFrame();

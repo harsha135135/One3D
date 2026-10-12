@@ -42,7 +42,7 @@ server {
     # Razorpay Checkout loads from checkout.razorpay.com and frames
     # api.razorpay.com; uploads go to the S3 bucket. Next.js needs inline
     # scripts and styles.
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://checkout.razorpay.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; connect-src 'self' ${ONE3D_UPLOAD_ORIGIN} https://api.razorpay.com https://lumberjack.razorpay.com; img-src 'self' data: https://cdn.razorpay.com; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://cdn.razorpay.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; connect-src 'self' ${ONE3D_UPLOAD_ORIGIN} https://api.razorpay.com https://lumberjack.razorpay.com; img-src 'self' data: https://cdn.razorpay.com; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" always;
 
     set $backend http://backend:8080;
     set $frontend http://frontend:3000;
