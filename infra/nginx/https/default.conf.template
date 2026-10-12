@@ -4,11 +4,18 @@
 # database and simulator are reachable only on the internal network.
 resolver 127.0.0.11 valid=10s ipv6=off;
 
+# Access log without query strings (sign-in codes and presigned URLs stay out),
+# with Nginx's request id, which the backend logs as request_id. Each server
+# below uses it in place of the image's default format.
+log_format one3d '$remote_addr [$time_local] "$request_method $uri $server_protocol" $status '
+                 '$body_bytes_sent $request_time rid=$request_id';
+
 server {
     listen 80;
     listen [::]:80;
     server_name ${ONE3D_DOMAIN};
     server_tokens off;
+    access_log /var/log/nginx/access.log one3d;
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -25,6 +32,7 @@ server {
     http2 on;
     server_name ${ONE3D_DOMAIN};
     server_tokens off;
+    access_log /var/log/nginx/access.log one3d;
 
     ssl_certificate     /etc/letsencrypt/live/${ONE3D_DOMAIN}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${ONE3D_DOMAIN}/privkey.pem;
@@ -55,6 +63,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
         proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header X-Request-Id $request_id;
         # These come from Nginx above; drop the backend's copies.
         proxy_hide_header Strict-Transport-Security;
         proxy_hide_header X-Frame-Options;

@@ -96,5 +96,16 @@ services:
     ports:
       - "127.0.0.1:8088:80"
 
+  # Metrics locally: Grafana on http://localhost:3001 (admin / local-dev-only)
+  # and Prometheus on http://localhost:9091 (9090 is the local storage).
+  # They read the backend container's metrics, not a backend run on the host.
+  prometheus:
+    ports:
+      - "127.0.0.1:9091:9090"
+
+  grafana:
+    ports:
+      - "127.0.0.1:3001:3000"
+
 volumes:
   one3d-storage:

@@ -54,6 +54,9 @@ services:
       # The heap may use 65% of the container's memory; the rest is metaspace,
       # threads and buffers.
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=65 -XX:+ExitOnOutOfMemoryError
+      # One JSON object per log line (Elastic Common Schema), with request_id,
+      # order_id, job_id, attempt_id, command_id or artifact_id where known.
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
     mem_limit: 640m
     restart: unless-stopped
 
@@ -63,6 +66,47 @@ services:
     mem_limit: 192m
     restart: unless-stopped
 
+  # Metrics (Checkpoint 8). Prometheus reads the backend's management port
+  # (8081) on this network; Grafana shows the provisioned "One3D overview"
+  # dashboard. Neither is published here (see the overrides), and Nginx does
+  # not route to them.
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.size=512MB
+    volumes:
+      - ./infra/monitoring/prometheus:/etc/prometheus:ro
+      - one3d-prometheus:/prometheus
+    mem_limit: 192m
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.4.12
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      # The deployment sets its own (SSM); this default is for local use only.
+      GF_SECURITY_ADMIN_PASSWORD: ${ONE3D_GRAFANA_ADMIN_PASSWORD:-local-dev-only}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/one3d-overview.json
+    volumes:
+      - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+      - one3d-grafana:/var/lib/grafana
+    mem_limit: 192m
+    restart: unless-stopped
+
 volumes:
   one3d-db:
   one3d-simulator:
+  one3d-prometheus:
+  one3d-grafana:

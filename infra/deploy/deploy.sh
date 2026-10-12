@@ -28,15 +28,18 @@ aws ssm get-parameters-by-path --region "$REGION" --path "$PARAMS/" --with-decry
 printf 'ONE3D_IMAGE_TAG=%s\n' "$TAG" >> "$tmp"
 mv "$tmp" "$ENV_FILE"
 set -a; . "$ENV_FILE"; set +a
-for required in ONE3D_REGISTRY ONE3D_DOMAIN ONE3D_DB_PASSWORD ONE3D_OIDC_CLIENT_SECRET RAZORPAY_KEY_ID; do
+for required in ONE3D_REGISTRY ONE3D_DOMAIN ONE3D_DB_PASSWORD ONE3D_OIDC_CLIENT_SECRET RAZORPAY_KEY_ID \
+    ONE3D_GRAFANA_ADMIN_PASSWORD; do
   [ -n "${!required:-}" ] || { echo "Missing parameter for $required under $PARAMS" >&2; exit 3; }
 done
 
 compose() { docker compose --env-file "$ENV_FILE" -f compose.yaml -f compose.deploy.yaml "$@"; }
-# Nginx is recreated whenever this bundle's templates differ from the running
-# ones (see the label in compose.deploy.yaml); otherwise it keeps running.
-export ONE3D_NGINX_CONFIG
+# Nginx, Prometheus and Grafana are recreated whenever this bundle's
+# configuration files differ from the running ones (see the labels in
+# compose.deploy.yaml); otherwise they keep running.
+export ONE3D_NGINX_CONFIG ONE3D_MONITORING_CONFIG
 ONE3D_NGINX_CONFIG=$(cat infra/nginx/bootstrap/* infra/nginx/https/* | sha256sum | cut -c1-16)
+ONE3D_MONITORING_CONFIG=$(find infra/monitoring -type f | sort | xargs cat | sha256sum | cut -c1-16)
 
 # --- images: exactly this commit's, from ECR ---------------------------------
 aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ONE3D_REGISTRY"

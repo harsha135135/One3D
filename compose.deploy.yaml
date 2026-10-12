@@ -2,7 +2,8 @@
 #   docker compose --env-file /opt/one3d/one3d.env -f compose.yaml -f compose.deploy.yaml up -d
 # infra/deploy/deploy.sh does this. Only Nginx is published, on 80 and 443;
 # the database, simulator, backend and frontend stay on the internal network.
-# Images come from ECR by commit SHA (ONE3D_REGISTRY, ONE3D_IMAGE_TAG); nothing
+# Prometheus and Grafana stay private too (Grafana on the instance's loopback
+# interface only). Images come from ECR by commit SHA (ONE3D_REGISTRY, ONE3D_IMAGE_TAG); nothing
 # is built on the server. Configuration and secrets come from SSM Parameter
 # Store, rendered by deploy.sh into /opt/one3d/one3d.env (root only).
 services:
@@ -18,6 +19,22 @@ services:
   simulator:
     environment:
       SIMULATOR_DEV_CONTROLS: "true"
+
+  # Metrics stay private: Prometheus is not published at all, and Grafana only
+  # on the instance's loopback interface, for SSM port forwarding
+  # (infra/README.md). Like Nginx, both are recreated when their configuration
+  # files change (hash set by deploy.sh).
+  prometheus:
+    labels:
+      one3d.monitoring-config: ${ONE3D_MONITORING_CONFIG:-unset}
+
+  grafana:
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${ONE3D_GRAFANA_ADMIN_PASSWORD:?set by deploy.sh from SSM}
+    labels:
+      one3d.monitoring-config: ${ONE3D_MONITORING_CONFIG:-unset}
+    ports:
+      - "127.0.0.1:3001:3000"
 
   nginx:
     image: nginx:1.29-alpine
