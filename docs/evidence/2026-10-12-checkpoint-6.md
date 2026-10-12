@@ -169,6 +169,13 @@ The local simulator journal (Docker volume `one3d-simulator`) was deleted and re
 - **Why:** it still held an externally started print from the Checkpoint 3 refusal demonstration. Only a start command naming that print could clear it, and the backend has no record of it.
 - **What else was checked:** nothing else was removed. The backend had no pending or running work at the time.
 
+## 8. CI
+
+[Run 38209645598](https://github.com/harsha135135/One3D/actions/runs/38209645598) on `2fd93da` (PR #7) passed all three jobs:
+- **simulator:** 14 tests;
+- **backend:** 46 unit and 181 integration tests in 2 min 24 s, with PostgreSQL, the simulator and S3Mock as containers and no Razorpay secrets;
+- **frontend:** lint, build, types and 26 Playwright runs.
+
 ## Known limitations
 
 - **No refunds or cancellation in V1.** Resolving a review records a decision; any refund is done in the Razorpay dashboard. An unpaid order stays AWAITING_PAYMENT after its payment window closes, and no new checkout can be opened.
