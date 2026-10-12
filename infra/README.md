@@ -22,13 +22,17 @@ infra/
 aws iam create-policy --policy-name one3d-deployer --policy-document file://infra/iam/one3d-deployer-policy.json
 aws iam create-user --user-name one3d-deployer
 aws iam attach-user-policy --user-name one3d-deployer --policy-arn arn:aws:iam::<account>:policy/one3d-deployer
+# aws login needs signin:AuthorizeOAuth2Access and signin:CreateOAuth2Token:
+aws iam attach-user-policy --user-name one3d-deployer --policy-arn arn:aws:iam::aws:policy/SignInLocalDevelopmentAccess
 ```
 
 The policy:
 - allows only One3D-named resources (`one3d-*` buckets, repositories, roles and `/one3d/*` parameters), plus EC2, Cognito and SSM in `ap-south-1`;
 - explicitly denies every OneCreations resource.
 
-The owner sets the user's console password and MFA device in the console. The user has **no access keys**; it is used through `aws login --profile one3d-deployer`. Every command below runs as this user.
+The owner sets the user's console password and MFA device in the console, without "must change password at next sign-in", because the policy does not allow changing it. The user has **no access keys**.
+
+It is used through `aws login --profile one3d-deployer --region ap-south-1`, run in a terminal where it can wait for the browser. First sign out of any root console session, or `aws login` reuses it and stores root credentials under that profile. Check with `aws sts get-caller-identity --profile one3d-deployer`, which must show `user/one3d-deployer`. Every command below runs as this user.
 
 **GitHub Actions** never uses this user. It assumes `one3d-demo-github-deploy` through OIDC, from the `main` branch only.
 

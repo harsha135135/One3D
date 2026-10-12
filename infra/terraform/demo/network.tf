@@ -23,7 +23,7 @@ resource "aws_security_group" "web" {
 
 resource "aws_vpc_security_group_ingress_rule" "http" {
   security_group_id = aws_security_group.web.id
-  description       = "HTTP (redirects to HTTPS; Let's Encrypt challenge)"
+  description       = "HTTP (redirects to HTTPS; Lets Encrypt challenge)"
   ip_protocol       = "tcp"
   from_port         = 80
   to_port           = 80
@@ -41,7 +41,7 @@ resource "aws_vpc_security_group_ingress_rule" "https" {
 
 resource "aws_vpc_security_group_egress_rule" "all" {
   security_group_id = aws_security_group.web.id
-  description       = "Outbound: ECR, S3, SSM, Cognito, Razorpay, Let's Encrypt, package updates"
+  description       = "Outbound: ECR, S3, SSM, Cognito, Razorpay, Lets Encrypt, package updates"
   ip_protocol       = "-1"
   cidr_ipv4         = "0.0.0.0/0"
 }
