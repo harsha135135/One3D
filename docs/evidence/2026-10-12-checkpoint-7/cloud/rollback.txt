@@ -1,0 +1,43 @@
+## 1. The two revisions
+  one3d-backend: 15ff7c2 sha256:77f0ff0ead36…, 70ef808 sha256:77f0ff0ead36…
+  one3d-frontend: 15ff7c2 sha256:30cfb5b3362e…, 70ef808 sha256:30cfb5b3362e…
+  one3d-simulator: 15ff7c2 sha256:e25a973fd6c5…, 70ef808 sha256:e25a973fd6c5…
+  database migrations changed between them: 0
+  files of the deploy bundle changed between them: compose.deploy.yaml infra/deploy/deploy.sh infra/nginx/https/default.conf.template 
+
+## 2. 15ff7c2, deployed by 'demo.sh start' (the newest passing commit on main)
+  (not evidence for the fix: demo.sh start first starts the stopped containers from the recorded commit's files)
+  run 38239605669: success (10:57:58–10:59:06 UTC)
+  Deployed 15ff7c20668b2da68664d17538a0aa65eed44a9f (previous: dc261254c384f9b38b2664843a8a944e4d5161aa)
+  Deploy status: Success
+  instance: deployed 15ff7c2, previous dc26125
+  live script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://cdn.razorpay.com
+  in the instance's rendered Nginx config: script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://cdn.razorpay.com
+  Nginx container started 10:58:32 UTC; deploy dispatched 10:56:50 UTC
+  PASS: Nginx was started by this deploy
+  PASS: the live script-src is 15ff7c2's
+  site: HTTP 200
+
+## 3. Roll back: Deploy a commit with 70ef808
+  run 38239757583: success (10:59:25–11:00:31 UTC)
+  Deployed 70ef808b5fb6fc73113de4e12a8071c07060c1f6 (previous: 15ff7c20668b2da68664d17538a0aa65eed44a9f)
+  Deploy status: Success
+  instance: deployed 70ef808, previous 15ff7c2
+  live script-src 'self' 'unsafe-inline' https://checkout.razorpay.com
+  in the instance's rendered Nginx config: script-src 'self' 'unsafe-inline' https://checkout.razorpay.com
+  Nginx container started 10:59:58 UTC; deploy dispatched 10:59:23 UTC
+  PASS: Nginx was started by this deploy
+  PASS: the live script-src is 70ef808's
+  site: HTTP 200
+
+## 4. Forward again: Deploy a commit with 15ff7c2
+  run 38239910658: success (11:00:46–11:01:54 UTC)
+  Deployed 15ff7c20668b2da68664d17538a0aa65eed44a9f (previous: 70ef808b5fb6fc73113de4e12a8071c07060c1f6)
+  Deploy status: Success
+  instance: deployed 15ff7c2, previous 70ef808
+  live script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://cdn.razorpay.com
+  in the instance's rendered Nginx config: script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://cdn.razorpay.com
+  Nginx container started 11:01:19 UTC; deploy dispatched 11:00:43 UTC
+  PASS: Nginx was started by this deploy
+  PASS: the live script-src is 15ff7c2's
+  site: HTTP 200

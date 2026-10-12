@@ -23,14 +23,25 @@ on_instance() {
   done
   aws ssm get-command-invocation --command-id "$id" --instance-id "$I" --query StandardOutputContent --output text
 }
+# serving <expected sha> <since>: what serves the site after a deploy dispatched at <since>.
 serving() {
   echo "  instance: $(on_instance 'echo deployed $(cut -c1-7 /opt/one3d/deployed-tag), previous $(cut -c1-7 /opt/one3d/previous-tag 2>/dev/null || echo none)')"
-  # Only the script-src directive: img-src allowed cdn.razorpay.com in both revisions.
-  local script_src
+  # Only the script-src directive: img-src allows cdn.razorpay.com in every revision.
+  local script_src started want has
   script_src=$(curl -sI https://demo.one3d.store/ | grep -i '^content-security-policy:' | grep -oE "script-src [^;]*" || true)
   echo "  live $script_src"
   echo "  in the instance's rendered Nginx config: $(on_instance 'docker exec one3d-nginx-1 grep -oE "script-src [^;]*" /etc/nginx/conf.d/default.conf')"
-  echo "  Nginx container started: $(on_instance 'docker inspect -f {{.State.StartedAt}} one3d-nginx-1' | cut -c12-19) UTC"
+  started=$(on_instance 'docker inspect -f {{.State.StartedAt}} one3d-nginx-1' | cut -c1-19)
+  echo "  Nginx container started ${started:11:8} UTC; deploy dispatched ${2:11:8} UTC"
+  [[ $started > ${2:0:19} ]] && echo "  PASS: Nginx was started by this deploy" || echo "  FAIL: Nginx was not restarted by this deploy"
+  # Only the newer revision allows https://cdn.razorpay.com in script-src.
+  want=no; [ "$1" = "$NEW" ] && want=yes
+  has=no; [[ $script_src == *https://cdn.razorpay.com* ]] && has=yes
+  if [ -n "$script_src" ] && [ "$has" = "$want" ]; then
+    echo "  PASS: the live script-src is ${1:0:7}'s"
+  else
+    echo "  FAIL: the live script-src is not ${1:0:7}'s"
+  fi
   echo "  site: HTTP $(curl -s -o /dev/null -w '%{http_code}' https://demo.one3d.store/api/catalog/configurations)"
 }
 # watch <sha> <since>: wait for the "Deploy a commit" run for that SHA created after <since> and summarize it.
@@ -57,15 +68,16 @@ echo "  database migrations changed between them: $(git -C "$ROOT" diff --name-o
 echo "  files of the deploy bundle changed between them: $(git -C "$ROOT" diff --name-only $OLD $NEW -- compose.yaml compose.deploy.yaml infra/nginx/bootstrap infra/nginx/https infra/deploy | tr '\n' ' ')"
 
 echo; echo "## 2. ${NEW:0:7}, deployed by 'demo.sh start' (the newest passing commit on main)"
+echo "  (not evidence for the fix: demo.sh start first starts the stopped containers from the recorded commit's files)"
 watch "$NEW" "${STARTED:?STARTED=<time demo.sh start began, UTC ISO>}"
-serving
+serving "$NEW" "$STARTED"
 
 echo; echo "## 3. Roll back: Deploy a commit with ${OLD:0:7}"
 since=$(date -u +%FT%TZ); gh workflow run deploy.yml --ref main -f sha="$OLD"; sleep 5
 watch "$OLD" "$since"
-serving
+serving "$OLD" "$since"
 
 echo; echo "## 4. Forward again: Deploy a commit with ${NEW:0:7}"
 since=$(date -u +%FT%TZ); gh workflow run deploy.yml --ref main -f sha="$NEW"; sleep 5
 watch "$NEW" "$since"
-serving
+serving "$NEW" "$since"
