@@ -27,6 +27,11 @@ services:
     environment:
       ONE3D_DOMAIN: ${ONE3D_DOMAIN}
       ONE3D_UPLOAD_ORIGIN: ${ONE3D_UPLOAD_ORIGIN}
+    # Nginx renders its templates only when the container starts, and Compose
+    # does not notice a changed file behind a bind mount. deploy.sh sets this
+    # to a hash of the templates, so a deploy that changes them recreates Nginx.
+    labels:
+      one3d.nginx-config: ${ONE3D_NGINX_CONFIG:-unset}
     volumes:
       # "bootstrap" until the first certificate exists, then "https".
       - ./infra/nginx/${ONE3D_NGINX_MODE:-https}:/etc/nginx/templates:ro
