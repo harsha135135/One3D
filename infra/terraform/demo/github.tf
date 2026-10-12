@@ -60,9 +60,10 @@ resource "aws_iam_role_policy" "github_deploy" {
         ]
       },
       {
+        # Also: is the demo running? A deploy to a stopped demo is skipped.
         Sid      = "ReadDeployResult"
         Effect   = "Allow"
-        Action   = ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations"]
+        Action   = ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations", "ec2:DescribeInstances"]
         Resource = "*"
       },
     ]

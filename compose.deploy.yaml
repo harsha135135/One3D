@@ -46,6 +46,13 @@ services:
       - letsencrypt:/etc/letsencrypt
       - acme:/var/www/certbot
 
+# Data that must survive lives on the separate EBS data volume mounted at
+# /opt/one3d/data (see infra/terraform/demo/user_data.sh.tftpl).
 volumes:
+  one3d-db:
+    driver_opts: {type: none, o: bind, device: /opt/one3d/data/postgres}
+  one3d-simulator:
+    driver_opts: {type: none, o: bind, device: /opt/one3d/data/simulator}
   letsencrypt:
+    driver_opts: {type: none, o: bind, device: /opt/one3d/data/letsencrypt}
   acme:

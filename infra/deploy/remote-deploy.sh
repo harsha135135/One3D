@@ -9,6 +9,15 @@ SHA=${1:?usage: remote-deploy.sh <commit sha>}
 [[ $SHA =~ ^[0-9a-f]{40}$ ]] || { echo "Not a commit SHA: $SHA" >&2; exit 2; }
 : "${AWS_REGION:?}" "${DEMO_INSTANCE_ID:?}" "${OPS_BUCKET:?}"
 
+# The demo runs on demand: if it is stopped, skip (demo.sh start deploys the
+# latest passing commit when it is next started).
+state=$(aws ec2 describe-instances --region "$AWS_REGION" --instance-ids "$DEMO_INSTANCE_ID" \
+  --query 'Reservations[0].Instances[0].State.Name' --output text)
+if [ "$state" != running ]; then
+  echo "::notice::The demo instance is $state; not deploying ${SHA:0:12}. 'infra/ops/demo.sh start' deploys the latest passing commit."
+  exit 0
+fi
+
 commands=$(jq -n --arg sha "$SHA" --arg bucket "$OPS_BUCKET" --arg region "$AWS_REGION" '[
   "set -eu",
   "aws s3 cp s3://\($bucket)/deploy/\($sha).tar.gz /tmp/one3d-\($sha).tar.gz --region \($region) --only-show-errors",

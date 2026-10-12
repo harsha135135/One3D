@@ -17,9 +17,21 @@ variable "instance_type" {
 }
 
 variable "root_volume_gb" {
-  description = "Encrypted gp3 root volume: OS, Docker images, the database and the simulator journal."
+  description = "Encrypted gp3 root volume: the OS and Docker images. The AMI needs at least 8 GB."
   type        = number
-  default     = 20
+  default     = 12
+}
+
+variable "data_volume_gb" {
+  description = "Separate encrypted gp3 volume for the database, the simulator journal and the TLS certificates; it survives stop/start and instance replacement."
+  type        = number
+  default     = 4
+}
+
+variable "termination_protection" {
+  description = "Blocks accidental termination of the instance. Set to false (and apply) only to destroy the demo."
+  type        = bool
+  default     = true
 }
 
 variable "github_repository" {

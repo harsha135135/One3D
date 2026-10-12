@@ -1,0 +1,120 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "OnlyApSouth1ExceptGlobalServices",
+      "Effect": "Deny",
+      "NotAction": ["iam:*", "sts:*", "budgets:*", "pricing:*", "freetier:*", "ce:*", "health:*"],
+      "Resource": "*",
+      "Condition": {"StringNotEquals": {"aws:RequestedRegion": "ap-south-1"}}
+    },
+    {
+      "Sid": "NeverTouchOneCreations",
+      "Effect": "Deny",
+      "Action": "*",
+      "Resource": [
+        "arn:aws:amplify:ap-south-1:099978878497:apps/d33rnqsv7wl48f",
+        "arn:aws:amplify:ap-south-1:099978878497:apps/d33rnqsv7wl48f/*",
+        "arn:aws:s3:::onecreations-media-099978878497",
+        "arn:aws:s3:::onecreations-media-099978878497/*",
+        "arn:aws:s3:::cf-templates-1prnzdu3q4iqo-ap-south-1",
+        "arn:aws:s3:::cf-templates-1prnzdu3q4iqo-ap-south-1/*",
+        "arn:aws:cloudformation:ap-south-1:099978878497:stack/onecreations/*",
+        "arn:aws:sns:ap-south-1:099978878497:onecreations-updates",
+        "arn:aws:iam::099978878497:role/AmplifySSRLoggingRole-*",
+        "arn:aws:budgets::099978878497:budget/OneCreations-Monthly-Budget"
+      ]
+    },
+    {
+      "Sid": "ComputeNetworkAndSignIn",
+      "Effect": "Allow",
+      "Action": ["ec2:*", "cognito-idp:*", "ecr:GetAuthorizationToken", "ssm:DescribeParameters",
+                 "ssm:SendCommand", "ssm:GetCommandInvocation", "ssm:ListCommandInvocations",
+                 "ssm:DescribeInstanceInformation", "ssm:StartSession", "ssm:TerminateSession",
+                 "ssm:ResumeSession", "resourcegroupstaggingapi:GetResources", "pricing:GetProducts",
+                 "freetier:Get*", "s3:ListAllMyBuckets", "iam:ListOpenIDConnectProviders"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AmazonLinuxImageLookup",
+      "Effect": "Allow",
+      "Action": ["ssm:GetParameter", "ssm:GetParameters"],
+      "Resource": "arn:aws:ssm:ap-south-1::parameter/aws/service/*"
+    },
+    {
+      "Sid": "One3dParameters",
+      "Effect": "Allow",
+      "Action": "ssm:*",
+      "Resource": ["arn:aws:ssm:ap-south-1:099978878497:parameter/one3d/*",
+                   "arn:aws:ssm:ap-south-1:099978878497:parameter/one3d"]
+    },
+    {
+      "Sid": "SecureStringsWithTheDefaultKey",
+      "Effect": "Allow",
+      "Action": ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey"],
+      "Resource": "*",
+      "Condition": {"StringEquals": {"kms:ViaService": "ssm.ap-south-1.amazonaws.com"}}
+    },
+    {
+      "Sid": "One3dBuckets",
+      "Effect": "Allow",
+      "Action": "s3:*",
+      "Resource": ["arn:aws:s3:::one3d-*", "arn:aws:s3:::one3d-*/*"]
+    },
+    {
+      "Sid": "One3dImageRepositories",
+      "Effect": "Allow",
+      "Action": "ecr:*",
+      "Resource": "arn:aws:ecr:ap-south-1:099978878497:repository/one3d-*"
+    },
+    {
+      "Sid": "One3dRolesAndInstanceProfiles",
+      "Effect": "Allow",
+      "Action": ["iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:UpdateRole", "iam:TagRole",
+                 "iam:UntagRole", "iam:UpdateAssumeRolePolicy", "iam:ListRolePolicies",
+                 "iam:ListAttachedRolePolicies", "iam:PutRolePolicy", "iam:GetRolePolicy",
+                 "iam:DeleteRolePolicy", "iam:ListInstanceProfilesForRole", "iam:CreateInstanceProfile",
+                 "iam:DeleteInstanceProfile", "iam:GetInstanceProfile", "iam:TagInstanceProfile",
+                 "iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile"],
+      "Resource": ["arn:aws:iam::099978878497:role/one3d-*",
+                   "arn:aws:iam::099978878497:instance-profile/one3d-*"]
+    },
+    {
+      "Sid": "OnlyTheSsmManagedPolicyMayBeAttached",
+      "Effect": "Allow",
+      "Action": ["iam:AttachRolePolicy", "iam:DetachRolePolicy"],
+      "Resource": "arn:aws:iam::099978878497:role/one3d-*",
+      "Condition": {"ArnEquals": {"iam:PolicyARN": "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"}}
+    },
+    {
+      "Sid": "PassTheInstanceRoleToEc2Only",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::099978878497:role/one3d-demo-instance",
+      "Condition": {"StringEquals": {"iam:PassedToService": "ec2.amazonaws.com"}}
+    },
+    {
+      "Sid": "GitHubOidcProvider",
+      "Effect": "Allow",
+      "Action": ["iam:CreateOpenIDConnectProvider", "iam:DeleteOpenIDConnectProvider",
+                 "iam:GetOpenIDConnectProvider", "iam:TagOpenIDConnectProvider",
+                 "iam:UntagOpenIDConnectProvider", "iam:UpdateOpenIDConnectProviderThumbprint",
+                 "iam:AddClientIDToOpenIDConnectProvider", "iam:RemoveClientIDFromOpenIDConnectProvider"],
+      "Resource": "arn:aws:iam::099978878497:oidc-provider/token.actions.githubusercontent.com"
+    },
+    {
+      "Sid": "AccountBudgets",
+      "Effect": "Allow",
+      "Action": ["budgets:ViewBudget", "budgets:ModifyBudget", "budgets:DescribeBudget*",
+                 "budgets:TagResource", "budgets:ListTagsForResource"],
+      "Resource": ["arn:aws:budgets::099978878497:budget/Account-*",
+                   "arn:aws:budgets::099978878497:budget/One3D-*"]
+    },
+    {
+      "Sid": "ReadBudgetsList",
+      "Effect": "Allow",
+      "Action": ["budgets:ViewBudget"],
+      "Resource": "*"
+    }
+  ]
+}

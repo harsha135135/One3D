@@ -38,16 +38,27 @@ compose() { docker compose --env-file "$ENV_FILE" -f compose.yaml -f compose.dep
 aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ONE3D_REGISTRY"
 compose pull --quiet db simulator backend frontend nginx
 
-# --- first run: obtain the certificate over HTTP -----------------------------
+# --- TLS: obtain the certificate on the first run, renew it when it is due ---
+# (Let's Encrypt certificates last 90 days; the demo is started on demand, so
+# every deploy and every start checks it.) CERTBOT_STAGING=1 uses the staging
+# CA, for rehearsals that must not count against the production rate limits.
+staging=()
+[ "${CERTBOT_STAGING:-0}" = 1 ] && staging=(--staging)
+renewed=0
 if ! compose run --rm --no-deps --entrypoint test certbot -f "/etc/letsencrypt/live/$ONE3D_DOMAIN/fullchain.pem"; then
   ONE3D_NGINX_MODE=bootstrap compose up -d --no-build nginx
   compose run --rm --no-deps certbot certonly --webroot -w /var/www/certbot -d "$ONE3D_DOMAIN" \
-    --agree-tos --register-unsafely-without-email --non-interactive
+    --agree-tos --register-unsafely-without-email --non-interactive "${staging[@]}"
+else
+  compose run --rm --no-deps certbot renew --webroot -w /var/www/certbot --non-interactive "${staging[@]}" \
+    | tee /tmp/certbot-renew.log
+  grep -q "Congratulations" /tmp/certbot-renew.log && renewed=1
 fi
 
 # --- start or update the stack ------------------------------------------------
 previous=$(cat /opt/one3d/deployed-tag 2>/dev/null || true)
 ONE3D_NGINX_MODE=https compose up -d --no-build --remove-orphans
+[ "$renewed" = 1 ] && compose exec -T nginx nginx -s reload
 [ -n "$previous" ] && [ "$previous" != "$TAG" ] && echo "$previous" > /opt/one3d/previous-tag
 echo "$TAG" > /opt/one3d/deployed-tag
 

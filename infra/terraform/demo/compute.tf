@@ -4,10 +4,20 @@ data "aws_ssm_parameter" "al2023" {
   name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
 }
 
+data "aws_subnet" "chosen" {
+  id = sort(data.aws_subnets.default.ids)[0]
+}
+
 resource "aws_instance" "demo" {
-  ami                    = nonsensitive(data.aws_ssm_parameter.al2023.value)
-  instance_type          = var.instance_type
-  subnet_id              = sort(data.aws_subnets.default.ids)[0]
+  ami                     = nonsensitive(data.aws_ssm_parameter.al2023.value)
+  instance_type           = var.instance_type
+  subnet_id               = data.aws_subnet.chosen.id
+  disable_api_termination = var.termination_protection
+  # Never bill surplus CPU credits: sustained load is throttled to the
+  # baseline instead (T instances default to "unlimited").
+  credit_specification {
+    cpu_credits = "standard"
+  }
   vpc_security_group_ids = [aws_security_group.web.id]
   iam_instance_profile   = aws_iam_instance_profile.demo.name
 
@@ -28,14 +38,33 @@ resource "aws_instance" "demo" {
   user_data = templatefile("${path.module}/user_data.sh.tftpl", {
     region          = var.region
     compose_version = var.compose_version
+    data_device     = "/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${replace(aws_ebs_volume.data.id, "-", "")}"
   })
-  user_data_replace_on_change = true
 
   tags = { Name = local.name }
 
+  # A new AMI release or a changed first-boot script never replaces the
+  # running instance (replacement is an explicit decision: terraform apply -replace).
   lifecycle {
-    ignore_changes = [ami]
+    ignore_changes = [ami, user_data]
   }
+}
+
+# The data volume lives apart from the instance: stopping, starting or even
+# replacing the instance keeps the database, the simulator journal and the
+# certificates.
+resource "aws_ebs_volume" "data" {
+  availability_zone = data.aws_subnet.chosen.availability_zone
+  size              = var.data_volume_gb
+  type              = "gp3"
+  encrypted         = true
+  tags              = { Name = "${local.name}-data" }
+}
+
+resource "aws_volume_attachment" "data" {
+  device_name = "/dev/sdf"
+  volume_id   = aws_ebs_volume.data.id
+  instance_id = aws_instance.demo.id
 }
 
 resource "aws_eip" "demo" {
@@ -93,6 +122,12 @@ resource "aws_iam_role_policy" "instance" {
         Effect   = "Allow"
         Action   = "s3:GetObject"
         Resource = "${aws_s3_bucket.ops.arn}/deploy/*"
+      },
+      {
+        Sid      = "DatabaseBackups"
+        Effect   = "Allow"
+        Action   = ["s3:PutObject", "s3:GetObject"]
+        Resource = "${aws_s3_bucket.ops.arn}/backups/*"
       },
       {
         Sid    = "AppConfiguration"

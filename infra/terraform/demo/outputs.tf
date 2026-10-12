@@ -7,6 +7,10 @@ output "instance_id" {
   value = aws_instance.demo.id
 }
 
+output "data_volume_id" {
+  value = aws_ebs_volume.data.id
+}
+
 output "github_deploy_role_arn" {
   value = aws_iam_role.github_deploy.arn
 }
