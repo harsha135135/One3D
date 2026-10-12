@@ -1,0 +1,2 @@
+signed in through Cognito (password + TOTP) as the demo customer: roles CUSTOMER, payment mode RAZORPAY_TEST
+placed order d0653b83: AWAITING_PAYMENT, 499 INR

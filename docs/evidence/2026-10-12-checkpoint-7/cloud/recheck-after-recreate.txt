@@ -1,0 +1,2 @@
+signed in through Cognito (password + TOTP) as the demo customer: roles CUSTOMER, payment mode RAZORPAY_TEST
+order d0653b83: HTTP 200 AWAITING_PAYMENT; file 3f45dde5: HTTP 200 VERIFIED

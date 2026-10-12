@@ -1,0 +1,45 @@
+## demo.sh stop  (09:44:04 UTC)
+backup: s3://one3d-demo-ops-ac0744/backups/one3d-20261012T094407Z.dump
+ Container one3d-nginx-1 Stopping 
+ Container one3d-nginx-1 Stopped 
+ Container one3d-backend-1 Stopping 
+ Container one3d-frontend-1 Stopping 
+ Container one3d-frontend-1 Stopped 
+ Container one3d-backend-1 Stopped 
+ Container one3d-db-1 Stopping 
+ Container one3d-simulator-1 Stopping 
+ Container one3d-simulator-1 Stopped 
+ Container one3d-db-1 Stopped 
+
+Stopped. Data stays on the data volume and in S3.
+## status while stopped
+instance: stopped
+https://demo.one3d.store/api/catalog/configurations: HTTP 000
+## demo.sh start  (09:45:03 UTC)
+Login Succeeded
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Processing /etc/letsencrypt/renewal/demo.one3d.store.conf
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Certificate not yet due for renewal
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+The following certificates are not due for renewal yet:
+  /etc/letsencrypt/live/demo.one3d.store/fullchain.pem expires on 2027-01-10 (skipped)
+No renewals were attempted.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Deployed 70ef808b5fb6fc73113de4e12a8071c07060c1f6 (previous: 70ef808b5fb6fc73113de4e12a8071c07060c1f6)
+
+ Container one3d-frontend-1 Started 
+ Container one3d-db-1 Started 
+ Container one3d-simulator-1 Started 
+ Container one3d-backend-1 Started 
+ Container one3d-nginx-1 Started 
+curl: (22) The requested URL returned error: 502
+curl: (22) The requested URL returned error: 502
+curl: (22) The requested URL returned error: 502
+curl: (22) The requested URL returned error: 502
+curl: (22) The requested URL returned error: 502
+
+Site: HTTP 200
+## done (09:46:18 UTC)
