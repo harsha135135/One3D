@@ -1,0 +1,10 @@
+# Local whole stack with monitoring, after the fault rehearsal (2026-10-12T11:36:31Z); limits from compose.yaml
+one3d-backend-1 465.6MiB / 640MiB
+one3d-db-1 40.04MiB / 256MiB
+one3d-frontend-1 41.09MiB / 192MiB
+one3d-grafana-1 140.1MiB / 192MiB
+one3d-idp-1 183.9MiB / 7.75GiB
+one3d-nginx-1 11.05MiB / 64MiB
+one3d-prometheus-1 119MiB / 192MiB
+one3d-simulator-1 134.3MiB / 192MiB
+one3d-storage-1 218.2MiB / 7.75GiB

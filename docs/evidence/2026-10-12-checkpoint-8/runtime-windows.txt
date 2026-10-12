@@ -1,0 +1,7 @@
+# Demo instance run windows (t3.small, ap-south-1), from the volume creation time and the
+# demo.sh logs (the deployment user cannot read CloudTrail). UTC.
+2026-10-12 08:23 - 09:44   first apply, first deploy, CP7 edge, file and container checks
+2026-10-12 09:45 - 09:51   stop/start demonstration
+2026-10-12 10:01 - 10:09   CSP check, test payments, full journey
+2026-10-12 10:31 - 10:40   deploy dc26125, first rollback run, webhook payment
+2026-10-12 10:56 - 11:04   deploy 15ff7c2, rollback run, payment under the new CSP

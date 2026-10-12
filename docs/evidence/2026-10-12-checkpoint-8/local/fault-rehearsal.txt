@@ -1,0 +1,61 @@
+
+## 1. An order is confirmed (demo shortcut) and released
+order 15a4c82b confirmed, job 0915ff04 released; printer bed clear
+one3d_simulator_unreachable_total:
+  operation=dispatch 0
+  operation=observe 0
+one3d_dispatch_results_total:
+  result=refused 0
+  result=started 0
+  result=unknown 0
+one3d_attempts_awaiting_reconciliation:
+   0
+one3d_work_items{kind=DISPATCH_START} (non-zero):
+one3d_work_oldest_age_seconds{kind=DISPATCH_START}:
+  kind=DISPATCH_START 0
+
+## 2. Fault: the simulator stops; the operator starts the print
+ Container one3d-simulator-1 Stopped 
+attempt b9cc31e8 recorded at 11:33:48 UTC; now: START_INTENT
+after 45 s: attempt RECONCILIATION_REQUIRED
+one3d_simulator_unreachable_total:
+  operation=dispatch 5
+  operation=observe 0
+one3d_dispatch_results_total:
+  result=refused 0
+  result=started 0
+  result=unknown 5
+one3d_attempts_awaiting_reconciliation:
+   1
+one3d_work_items{kind=DISPATCH_START} (non-zero):
+  kind=DISPATCH_START,status=EXHAUSTED 1
+one3d_work_oldest_age_seconds{kind=DISPATCH_START}:
+  kind=DISPATCH_START 0
+
+## 3. The logs for that attempt (JSON lines carrying its attempt_id)
+{"time":"11:33:49","level":"WARN","message":"Start of attempt b9cc31e8-ef12-4ffc-8e93-2c17fad56a3a not confirmed (command 549c7693-b1bd-4e65-ac2b-1e43ebf2405c): Simulator did not answer: null","attempt_id":"b9cc31e8-ef12-4ffc-8e93-2c17fad56a3a","command_id":"549c7693-b1bd-4e65-ac2b-1e43ebf2405c","job_id":"0915ff04-d253-4c04-873c-d3b96aa49104"}
+{"time":"11:33:51","level":"WARN","message":"Start of attempt b9cc31e8-ef12-4ffc-8e93-2c17fad56a3a not confirmed (command 549c7693-b1bd-4e65-ac2b-1e43ebf2405c): Simulator did not answer: null","attempt_id":"b9cc31e8-ef12-4ffc-8e93-2c17fad56a3a","command_id":"549c7693-b1bd-4e65-ac2b-1e43ebf2405c","job_id":"0915ff04-d253-4c04-873c-d3b96aa49104"}
+{"time":"11:33:55","level":"WARN","message":"Start of attempt b9cc31e8-ef12-4ffc-8e93-2c17fad56a3a not confirmed (command 549c7693-b1bd-4e65-ac2b-1e43ebf2405c): Simulator did not answer: null","attempt_id":"b9cc31e8-ef12-4ffc-8e93-2c17fad56a3a","command_id":"549c7693-b1bd-4e65-ac2b-1e43ebf2405c","job_id":"0915ff04-d253-4c04-873c-d3b96aa49104"}
+{"time":"11:34:03","level":"WARN","message":"Start of attempt b9cc31e8-ef12-4ffc-8e93-2c17fad56a3a not confirmed (command 549c7693-b1bd-4e65-ac2b-1e43ebf2405c): Simulator did not answer: null","attempt_id":"b9cc31e8-ef12-4ffc-8e93-2c17fad56a3a","command_id":"549c7693-b1bd-4e65-ac2b-1e43ebf2405c","job_id":"0915ff04-d253-4c04-873c-d3b96aa49104"}
+{"time":"11:34:20","level":"WARN","message":"Start of attempt b9cc31e8-ef12-4ffc-8e93-2c17fad56a3a not confirmed (command 549c7693-b1bd-4e65-ac2b-1e43ebf2405c): Simulator did not answer: null","attempt_id":"b9cc31e8-ef12-4ffc-8e93-2c17fad56a3a","command_id":"549c7693-b1bd-4e65-ac2b-1e43ebf2405c","job_id":"0915ff04-d253-4c04-873c-d3b96aa49104"}
+start deliveries whose tries ran out (operator list; this local database also keeps earlier runs): 1
+screenshot: saved grafana-during-fault.png
+
+## 4. Recovery: the simulator is back; the operator reconciles the uncertain start
+ Container one3d-simulator-1 Started 
+reconcile: RECONCILIATION_REQUIRED
+attempt: RUNNING
+job after the simulator completes: AWAITING_QC
+one3d_simulator_unreachable_total:
+  operation=dispatch 5
+  operation=observe 0
+one3d_dispatch_results_total:
+  result=refused 0
+  result=started 1
+  result=unknown 5
+one3d_attempts_awaiting_reconciliation:
+   0
+one3d_work_items{kind=DISPATCH_START} (non-zero):
+one3d_work_oldest_age_seconds{kind=DISPATCH_START}:
+  kind=DISPATCH_START 0
+screenshot: saved grafana-after-recovery.png

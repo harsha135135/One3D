@@ -1,0 +1,8 @@
+# M2-id-as-metric-label: DispatchWorker.java changed: '                metrics.dispatched(result.kind());' -> '                metrics.dispatched(result.kind());
+                io.micrometer.core.instrument.Metrics.globalRegistry.getRegistries().forEach(r -> r.counter("one3d.dispatch.by.attempt", "attempt", request.attemptId().toString()).increment());'
+build exit code: 1 (restored with cmp: yes)
+Tests run: 2, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 9.166 s <<< FAILURE! -- in store.one3d.production.ProductionMetricsIT
+store.one3d.production.ProductionMetricsIT.noMetricLabelCarriesAnId -- Time elapsed: 0.051 s <<< FAILURE!
+Expecting empty but was: ["one3d.dispatch.by.attempt tag(attempt=3adf11fd-3a76-4594-974a-429445ee9cae)"]
+Expecting empty but was: ["one3d.dispatch.by.attempt tag(attempt=3adf11fd-3a76-4594-974a-429445ee9cae)"]
+Tests run: 2, Failures: 1, Errors: 0, Skipped: 0
