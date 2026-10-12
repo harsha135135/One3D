@@ -25,6 +25,7 @@ V1 takes payment through one provider in test mode ([v1-scope.md](../v1-scope.md
   - **Payments:** a unique provider payment id makes the same payment reported twice a no-op. That covers two different events, or a webhook plus a reconciliation.
   - Both inserts use `ON CONFLICT DO NOTHING`, so a duplicate waits for the first transaction and is then acknowledged.
 - **One lock order.** Lock the order row, then the checkout row, then decide. Concurrent reports for one order are therefore decided one at a time. A partial unique index allows only one APPLIED payment per order, as the backstop.
+- **That backstop deliberately answers 5xx.** If the index ever fires, the answer is 5xx, not a 409: Razorpay then retries, and the retry is decided on current data and recorded for review. Do not map `payment_one_applied_per_order` to a 4xx. `checkout_one_open_per_order` cannot be reached while checkouts lock the order first, so it is not mapped either.
 - **Acknowledge only what is durable.** The webhook receipt and its effect commit in one transaction, and the endpoint answers 2xx only after that commit. Any failure answers 5xx and leaves nothing, so Razorpay retries.
 - **Manual review instead of guessing.** A captured payment is kept as NEEDS_REVIEW, and the order does not change, when:
   - its Razorpay order is unknown;

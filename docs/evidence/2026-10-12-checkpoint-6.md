@@ -10,8 +10,8 @@ Checkpoint / claim:  Roadmap Checkpoint 6. Customers pay through Razorpay in TES
                      follow the same production workflow to handoff, and customers see a
                      timeline built from recorded facts.
 Date:                2026-10-12
-Code revision:       9ac75e9 (backend), 523489a (frontend) on feat/checkpoint-6, on top of main
-                     5aa0141
+Code revision:       9ac75e9 (backend), 523489a (frontend), 9c9723d (quote acceptance near
+                     expiry) on feat/checkpoint-6, on top of main 5aa0141
 Environment:         macOS (arm64); OpenJDK 21.0.12.1; Spring Boot 4.1.1; PostgreSQL 17.11;
                      Razorpay test mode (Orders API, hosted Checkout, its test card and demo
                      bank page); Next.js 16.4.0; Playwright 1.64.0 (Chromium); mock-oauth2-server
@@ -31,7 +31,7 @@ Design: [decision 0002](../decisions/0002-test-mode-payments.md).
 
 | Suite | Command (from its directory) | Result |
 |---|---|---|
-| backend | `./mvnw clean verify` | **226 passed**: 46 unit, 180 integration. 11:09 IST on `523489a`, 29.3 s |
+| backend | `./mvnw clean verify` | **227 passed**: 46 unit, 181 integration. 11:18 IST on `9c9723d`, 28.0 s |
 | simulator | `./mvnw clean verify` | 14 passed (unchanged) |
 | frontend | `npm run lint`, `npm run build`, `npm run typecheck`, `npm run test:e2e` | Lint and types clean. Build produced 13 routes. **26 Playwright runs passed**: 13 tests at 1280 × 800 and at 390 × 844 |
 
@@ -52,6 +52,7 @@ New tests:
 | `RazorpayGatewayTest` | 4 | Against a local HTTP stub: Basic auth, `payment.capture = automatic`, response parsing, and an error message that does not echo the body |
 | `SecurityIT` (+1) | 10 | The webhook is the only anonymous `/api` exception and still needs a signature; PUT and GET on that path are not open |
 | `ProductionTransitionsIT` (+1) | | Handed over only after ready for handoff |
+| `QuotesIT` (+1) | | A quote with less than 15 minutes left cannot be accepted, because its order could not be paid (`QUOTE_EXPIRING`) |
 
 **`RazorpayWebhookIT` (22 tests):**
 - **Applied correctly:** a signed captured payment confirms the order and creates no job or work.
@@ -63,7 +64,7 @@ New tests:
 - **Failure handling:** a failure while recording is not acknowledged, and the retry succeeds.
 - **Operator review:** an operator resolves a review.
 
-CI: see section 7. Reports: [`backend-test-reports/`](2026-10-12-checkpoint-6/backend-test-reports/), [`frontend/playwright-smoke.txt`](2026-10-12-checkpoint-6/frontend/playwright-smoke.txt).
+CI: see section 8. Reports: [`backend-test-reports/`](2026-10-12-checkpoint-6/backend-test-reports/), [`frontend/playwright-smoke.txt`](2026-10-12-checkpoint-6/frontend/playwright-smoke.txt).
 
 ## 2. Rules, enforcement and tests
 
@@ -71,6 +72,7 @@ CI: see section 7. Reports: [`backend-test-reports/`](2026-10-12-checkpoint-6/ba
 |---|---|---|
 | Test mode only; the demo shortcut cannot bypass hosted checkout | `PaymentModeGuard` (startup) | `PaymentModeGuardTest`; real stack: the demo route is 404 with Razorpay on; controls P8, P9 |
 | The server decides the amount; a checkout never outlasts the payment window (a custom order's window is its quote's validity) | `CheckoutService.open`, `CustomerOrder.requirePayable`, V8 `payment_window_ends_at` | `CheckoutIT`; `QuotesIT` (window equals quote expiry); real stack sections 2 and 6 |
+| A quote cannot be accepted when too little time is left to pay for its order | `QuoteService.accept` (`MIN_TIME_TO_PAY`, 15 minutes) | `QuotesIT.aQuoteTooCloseToExpiryToBePaidCannotBeAccepted` |
 | Razorpay is never called inside a database transaction | `CheckoutService` (insert, call, attach, each in its own transaction) | `CheckoutIT.aProviderOutageReturns503AndTheNextAttemptStartsAFreshCheckout` |
 | A webhook is accepted only with a valid signature over the raw body and an event id; only POST on that one path skips the session and CSRF checks | `RazorpayWebhookController`, `WebhookSignature` (constant-time); `SecurityConfig` | `RazorpayWebhookIT.aForgedOrTamperedWebhookIsRefused…`, `SecurityIT`; real stack section 4; controls P1, P7 |
 | Only a captured payment confirms; authorized or failed never does, from either path | `RazorpayWebhooks` (event type and status), `CheckoutService.check` (filter), `PaymentRecorder` (guard) | `authorizedOrFailedNeverConfirms…`, `CheckoutIT.aPaymentCheckDoesNotConfirmAnAuthorizedPayment`; real stack; control P2 |
@@ -127,6 +129,8 @@ Transcript: [`payment-journey.txt`](2026-10-12-checkpoint-6/real-stack/payment-j
 | Production | Both orders: release, start on the simulator (RUNNING), complete, QC passed, ready for handoff, handed over. The bed was cleared by the operator between the two prints |
 | Timelines | Catalog: PLACED, CONFIRMED ("Paid with Razorpay test mode"), PAYMENT_UNDER_REVIEW ("An extra payment was received…"), RELEASED_TO_PRODUCTION, QC_PASSED, READY_FOR_HANDOFF, HANDED_OVER. Custom: the same, starting "From quote …" |
 
+**README command.** The README's Razorpay start command was then run once exactly as written, in bash. It started the backend with Razorpay enabled, which rejected an unsigned webhook with `INVALID_SIGNATURE`, and it was stopped.
+
 **Secret checks.**
 - The values of `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` were searched for with `grep -cF`, which prints counts only.
 - **0** occurrences in the backend and frontend logs, under `docs/` and in tracked files.
@@ -151,9 +155,19 @@ Screenshots of both Checkout runs are in [`screenshots/catalog`](2026-10-12-chec
 
 - **Real webhook delivery.**
   - The owner configures the dashboard webhook: URL `https://demo.one3d.store/api/payments/razorpay/webhook`, the same secret, and the events `payment.captured`, `order.paid`, `payment.authorized` and `payment.failed`.
-  - Confirm that a real delivery is accepted and that its payload shape matches the fixtures.
-- **Nginx's Content-Security-Policy** must allow scripts and frames from `checkout.razorpay.com` (and `api.razorpay.com`).
+  - The check must show a real `payment.captured` delivery answered **APPLIED or ALREADY_RECORDED**, not just any 2xx. A capture event whose payment entity could not be read is acknowledged as IGNORED and leaves only a log line.
+  - It must also show that the `X-Razorpay-Event-Id` header is present. Without it the endpoint answers 400, and Razorpay would retry for 24 hours and then disable the webhook.
+  - The risk is low: the same parser already read real Razorpay payment entities from the API in both reconciliation runs here.
+- **Nginx:**
+  - its Content-Security-Policy must allow scripts and frames from `checkout.razorpay.com` (and `api.razorpay.com`);
+  - it must keep the request-body limit small for `/api`. The webhook is open without sign-in and its body is read before the signature check. File uploads go straight to S3, so there is no reason to raise the limit.
 - **The `aws` profile** reads the keys from SSM. The guard already refuses non-test keys and the demo shortcut.
+
+## 7. Local data reset for this run
+
+The local simulator journal (Docker volume `one3d-simulator`) was deleted and recreated before the real-stack run.
+- **Why:** it still held an externally started print from the Checkpoint 3 refusal demonstration. Only a start command naming that print could clear it, and the backend has no record of it.
+- **What else was checked:** nothing else was removed. The backend had no pending or running work at the time.
 
 ## Known limitations
 
