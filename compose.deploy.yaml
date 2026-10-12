@@ -11,9 +11,13 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: aws
 
+  # The simulator's /dev controls (complete or fail the running print) stay on:
+  # there is no real printer, so a print only finishes when an operator says so.
+  # The port is not published and Nginx does not route to it, so /dev is
+  # reachable only on the internal network (infra/deploy/simulator.sh, via SSM).
   simulator:
     environment:
-      SIMULATOR_DEV_CONTROLS: "false"
+      SIMULATOR_DEV_CONTROLS: "true"
 
   nginx:
     image: nginx:1.29-alpine

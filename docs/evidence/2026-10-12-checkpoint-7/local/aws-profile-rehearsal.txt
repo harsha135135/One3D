@@ -1,0 +1,17 @@
+# The real backend image (one3d/one3d-backend:local) on the local Compose network with
+# SPRING_PROFILES_ACTIVE=aws, Cognito-shaped HTTPS settings and dummy test values
+# (client secret, bucket and Razorpay test keys are placeholders), 2026-10-12.
+
+## 1. Valid aws settings: starts
+The following 1 profile is active: "aws"
+Started One3dApplication in 4.515 seconds
+
+## 2. GET /oauth2/authorization/oidc, forwarded as Nginx does (Host demo.one3d.store, X-Forwarded-Proto https)
+HTTP/1.1 302
+Set-Cookie: XSRF-TOKEN=…; Path=/; Secure
+Set-Cookie: JSESSIONID=…; Path=/; Secure; HttpOnly; SameSite=Lax
+Location: https://one3d-demo-rehearsal.auth.ap-south-1.amazoncognito.com/oauth2/authorize?response_type=code&client_id=rehearsal-client&scope=openid%20email%20profile&state=…&redirect_uri=https://demo.one3d.store/login/oauth2/code/oidc&nonce=…&code_challenge=…&code_challenge_method=S256
+GET /api/catalog/configurations: 200
+
+## 3. Same image, mock issuer and local storage endpoint: refuses to start (exit code 1)
+Refusing to start the aws profile: one3d.identity.issuer must be the HTTPS issuer of the real identity provider; one3d.storage.endpoint must be empty on AWS (real S3 with the instance role)
