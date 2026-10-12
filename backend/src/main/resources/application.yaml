@@ -55,6 +55,30 @@ server:
         http-only: true
         same-site: lax
 
+management:
+  server:
+    # Health and Prometheus metrics on their own port, which is never published
+    # and which Nginx does not route to. It listens where the API does: the
+    # loopback interface on the host, the container interface in Docker.
+    port: 8081
+    address: ${server.address}
+  endpoints:
+    web:
+      # No index page listing the endpoints.
+      discovery:
+        enabled: false
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never
+  metrics:
+    distribution:
+      # Fixed latency buckets (seconds) for every API route, instead of a full
+      # histogram per route.
+      slo:
+        http.server.requests: 50ms,100ms,250ms,500ms,1000ms,2500ms,5000ms
+
 one3d:
   # The address people open in the browser (frontend and API share it).
   # Sign-in returns here, and the OIDC redirect URI is built from it.

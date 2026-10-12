@@ -2,6 +2,7 @@ package store.one3d.files;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import store.one3d.background.BackgroundJob;
@@ -53,7 +54,9 @@ public class ArtifactVerifier implements BackgroundJob {
 
     void process(PendingWorkStore.ClaimedWork claimed) {
         ArtifactVerification.Target target = verification.target(claimed.subjectId());
-        verification.apply(claimed, check(target));
+        try (MDC.MDCCloseable artifact = MDC.putCloseable("artifact_id", target.artifactId().toString())) {
+            verification.apply(claimed, check(target));
+        }
     }
 
     private ArtifactVerification.Outcome check(ArtifactVerification.Target target) {

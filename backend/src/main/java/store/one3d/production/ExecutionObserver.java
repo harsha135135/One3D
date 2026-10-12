@@ -2,6 +2,7 @@ package store.one3d.production;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 import store.one3d.background.BackgroundJob;
 
@@ -19,10 +20,12 @@ public class ExecutionObserver implements BackgroundJob {
 
     private final DispatchOutcomes outcomes;
     private final SimulatorClient simulator;
+    private final ProductionMetrics metrics;
 
-    ExecutionObserver(DispatchOutcomes outcomes, SimulatorClient simulator) {
+    ExecutionObserver(DispatchOutcomes outcomes, SimulatorClient simulator, ProductionMetrics metrics) {
         this.outcomes = outcomes;
         this.simulator = simulator;
+        this.metrics = metrics;
     }
 
     @Override
@@ -35,11 +38,16 @@ public class ExecutionObserver implements BackgroundJob {
         int checked = 0;
         for (UUID commandId : outcomes.commandsOfRunningAttempts()) {
             checked++;
-            try {
+            try (MDC.MDCCloseable command = MDC.putCloseable("command_id", commandId.toString())) {
                 simulator.findCommand(commandId)
                         .filter(report -> !"RUNNING".equals(report.phase()))
-                        .ifPresent(report -> outcomes.recordExecutionEnd(commandId, report));
+                        .ifPresent(report -> {
+                            if (outcomes.recordExecutionEnd(commandId, report)) {
+                                metrics.attemptEnded("COMPLETED".equals(report.phase()));
+                            }
+                        });
             } catch (SimulatorUnavailableException e) {
+                metrics.simulatorUnreachable(ProductionMetrics.SimulatorOperation.OBSERVE);
                 log.warn("Could not observe command {}: {}", commandId, e.getMessage());
             }
         }

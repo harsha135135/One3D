@@ -3,6 +3,9 @@ package store.one3d.files;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
@@ -32,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * the browser and PUTs to the presigned URL the API returns.
  */
 @PostgresIntegrationTest
+@ExtendWith(OutputCaptureExtension.class)
 class FilesIT {
 
     private static final long LIMIT = 20_971_520;
@@ -199,7 +203,7 @@ class FilesIT {
     }
 
     @Test
-    void theDownloadIsTheExactCheckedVersionServedAsAnAttachment() throws Exception {
+    void theDownloadIsTheExactCheckedVersionServedAsAnAttachment(CapturedOutput output) throws Exception {
         byte[] original = StlFixtures.binary(6);
         FileSteps.Upload upload = files.startUpload(alice, "pinned.stl", original.length);
         files.put(upload, original);
@@ -229,6 +233,9 @@ class FilesIT {
         mvc.perform(get("/api/files/{id}", upload.artifactId()).with(alice))
                 .andExpect(jsonPath("$.versionId").value(pinned))
                 .andExpect(jsonPath("$.sha256").value(StlFixtures.sha256(original)));
+        // Nothing logged during the upload, check and download contains a signed URL.
+        assertThat(output.getAll().contains("X-Amz-Signature")).as("a signature in the logs").isFalse();
+        assertThat(output.getAll().contains("X-Amz-Credential")).as("a credential in the logs").isFalse();
     }
 
     @Test

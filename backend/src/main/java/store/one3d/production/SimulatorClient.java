@@ -83,7 +83,9 @@ class SimulatorClient {
         try {
             return http.send(request.timeout(requestTimeout).build(), HttpResponse.BodyHandlers.ofString());
         } catch (IOException e) {
-            throw new SimulatorUnavailableException("Simulator did not answer: " + e.getMessage(), e);
+            // Some failures (an unknown host, a refused connection) carry no message; name the kind instead.
+            String detail = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            throw new SimulatorUnavailableException("Simulator did not answer: " + detail, e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new SimulatorUnavailableException("Interrupted while calling the simulator", e);

@@ -2,6 +2,7 @@ package store.one3d.production;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import store.one3d.background.BackgroundJob;
@@ -29,15 +30,18 @@ public class DispatchWorker implements BackgroundJob {
     private final PendingWorkStore work;
     private final DispatchOutcomes outcomes;
     private final SimulatorClient simulator;
+    private final ProductionMetrics metrics;
     private final int batchSize;
     private final Duration lease;
 
     DispatchWorker(PendingWorkStore work, DispatchOutcomes outcomes, SimulatorClient simulator,
+                   ProductionMetrics metrics,
                    @Value("${one3d.worker.batch-size}") int batchSize,
                    @Value("${one3d.worker.lease}") Duration lease) {
         this.work = work;
         this.outcomes = outcomes;
         this.simulator = simulator;
+        this.metrics = metrics;
         this.batchSize = batchSize;
         this.lease = lease;
     }
@@ -52,8 +56,15 @@ public class DispatchWorker implements BackgroundJob {
 
     void process(PendingWorkStore.ClaimedWork claimed) {
         SimulatorClient.StartRequest request = outcomes.startRequest(claimed.subjectId());
-        DispatchResult result = deliver(request);
-        outcomes.apply(claimed, result);
+        // Every log line about this delivery names the command, attempt and job.
+        try (MDC.MDCCloseable command = MDC.putCloseable("command_id", request.commandId().toString());
+             MDC.MDCCloseable attempt = MDC.putCloseable("attempt_id", request.attemptId().toString());
+             MDC.MDCCloseable job = MDC.putCloseable("job_id", request.jobId().toString())) {
+            DispatchResult result = deliver(request);
+            if (outcomes.apply(claimed, result)) {
+                metrics.dispatched(result.kind());
+            }
+        }
     }
 
     private DispatchResult deliver(SimulatorClient.StartRequest request) {
@@ -61,6 +72,7 @@ public class DispatchWorker implements BackgroundJob {
             Optional<SimulatorClient.CommandReport> known = simulator.findCommand(request.commandId());
             return DispatchResult.from(known.isPresent() ? known.get() : simulator.start(request));
         } catch (SimulatorUnavailableException e) {
+            metrics.simulatorUnreachable(ProductionMetrics.SimulatorOperation.DISPATCH);
             log.warn("Start of attempt {} not confirmed (command {}): {}",
                     request.attemptId(), request.commandId(), e.getMessage());
             return DispatchResult.unknown(e.getMessage());
