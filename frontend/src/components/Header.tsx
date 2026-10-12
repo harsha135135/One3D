@@ -50,6 +50,9 @@ export function Header() {
                 <Link href="/ops/requests">Requests</Link>
               </li>
               <li>
+                <Link href="/ops/payments">Payments</Link>
+              </li>
+              <li>
                 <Link href="/ops/printers">Printers</Link>
               </li>
             </>
