@@ -16,6 +16,7 @@ import org.springframework.security.oauth2.jwt.JwtIssuerValidator;
 import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 /**
@@ -25,6 +26,9 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
  * <ul>
  *   <li>{@code GET /api/catalog/**}: anyone.</li>
  *   <li>{@code /api/ops/**}: OPERATOR only. "/ops" in the UI is just a page group.</li>
+ *   <li>{@code POST /api/payments/razorpay/webhook}: no session and no CSRF
+ *       token; it is authenticated by Razorpay's signature instead. This is
+ *       the only exception, for that one method and path.</li>
  *   <li>Any other {@code /api/**}: any signed-in user (CUSTOMER).</li>
  * </ul>
  *
@@ -34,12 +38,17 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
 @Configuration
 class SecurityConfig {
 
+    /** Exactly one method and path; signed by Razorpay (see payments.RazorpayWebhookController). */
+    private static final RequestMatcher RAZORPAY_WEBHOOK =
+            PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/payments/razorpay/webhook");
+
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityProblems problems,
                                             @Value("${one3d.public-url}") String publicUrl) throws Exception {
         http
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers(HttpMethod.GET, "/api/catalog/**").permitAll()
+                        .requestMatchers(RAZORPAY_WEBHOOK).permitAll()
                         .requestMatchers("/api/ops/**").hasRole("OPERATOR")
                         .requestMatchers("/api/**").authenticated()
                         .requestMatchers("/oauth2/**", "/login/**", "/error").permitAll()
@@ -48,7 +57,7 @@ class SecurityConfig {
                 .logout(logout -> logout
                         .logoutUrl("/logout")
                         .logoutSuccessHandler((request, response, authentication) -> response.setStatus(204)))
-                .csrf(csrf -> csrf.spa())
+                .csrf(csrf -> csrf.spa().ignoringRequestMatchers(RAZORPAY_WEBHOOK))
                 .addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class)
                 .exceptionHandling(errors -> errors
                         .defaultAuthenticationEntryPointFor(problems,

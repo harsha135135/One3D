@@ -99,7 +99,8 @@ public class QuoteService {
                 "CUSTOM-" + quote.getId().toString().substring(0, 8),
                 revision.material() + ", " + revision.colour() + " (revision " + revision.revisionNumber() + ")",
                 quote.getPriceMinor(),
-                quote.getCurrency()));
+                quote.getCurrency(),
+                quote.getExpiresAt()));
         quote.accept(order.id(), now);
         requests.markOrdered(requestId);
         return order;

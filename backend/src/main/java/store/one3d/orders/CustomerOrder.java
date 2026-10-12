@@ -10,6 +10,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import store.one3d.catalog.CatalogSnapshot;
 import store.one3d.common.ConflictException;
 import store.one3d.common.Money;
@@ -49,6 +50,17 @@ class CustomerOrder {
     @Column(name = "ready_for_handoff_at")
     private Instant readyForHandoffAt;
 
+    @Column(name = "handed_over_at")
+    private Instant handedOverAt;
+
+    // The last moment a checkout may be open for this order.
+    @Column(name = "payment_window_ends_at", updatable = false)
+    private Instant paymentWindowEndsAt;
+
+    // Null until first saved; protects every later change against concurrent edits.
+    @Version
+    private Long version;
+
     // Saving the order also inserts its line (cascade), in the same transaction.
     @OneToOne(mappedBy = "order", cascade = CascadeType.PERSIST, optional = false)
     private OrderLine line;
@@ -61,7 +73,8 @@ class CustomerOrder {
      * Creates a new order awaiting payment, copying the catalog values into
      * its line so later catalog changes cannot alter it.
      */
-    static CustomerOrder place(UUID customerId, CatalogSnapshot item, int quantity, Instant createdAt) {
+    static CustomerOrder place(UUID customerId, CatalogSnapshot item, int quantity, Instant createdAt,
+                               Instant paymentWindowEndsAt) {
         if (quantity != V1_QUANTITY) {
             throw new IllegalArgumentException("A V1 order has quantity " + V1_QUANTITY + ", not " + quantity);
         }
@@ -69,6 +82,7 @@ class CustomerOrder {
         order.customerId = customerId;
         order.status = OrderStatus.AWAITING_PAYMENT;
         order.createdAt = createdAt;
+        order.paymentWindowEndsAt = paymentWindowEndsAt;
         order.line = new OrderLine(order, item, quantity);
         return order;
     }
@@ -79,6 +93,7 @@ class CustomerOrder {
         order.customerId = customerId;
         order.status = OrderStatus.AWAITING_PAYMENT;
         order.createdAt = createdAt;
+        order.paymentWindowEndsAt = item.paymentWindowEndsAt();
         order.line = new OrderLine(order, item, V1_QUANTITY);
         return order;
     }
@@ -102,6 +117,28 @@ class CustomerOrder {
         requireConfirmed();
         status = OrderStatus.READY_FOR_HANDOFF;
         readyForHandoffAt = now;
+    }
+
+    /** The customer collected the part; recorded by an operator. */
+    void markHandedOver(Instant now) {
+        if (status != OrderStatus.READY_FOR_HANDOFF) {
+            throw new ConflictException("ORDER_NOT_READY_FOR_HANDOFF",
+                    "Order " + id + " is " + status + ", not READY_FOR_HANDOFF.");
+        }
+        status = OrderStatus.HANDED_OVER;
+        handedOverAt = now;
+    }
+
+    /** A checkout can be opened only while the order awaits payment and its payment window is open. */
+    void requirePayable(Instant now) {
+        if (status != OrderStatus.AWAITING_PAYMENT) {
+            throw new ConflictException("ORDER_NOT_AWAITING_PAYMENT",
+                    "Order " + id + " is " + status + ", not AWAITING_PAYMENT.");
+        }
+        if (!now.isBefore(paymentWindowEndsAt)) {
+            throw new ConflictException("PAYMENT_WINDOW_CLOSED",
+                    "The payment window for order " + id + " closed at " + paymentWindowEndsAt + ".");
+        }
     }
 
     void requireConfirmed() {
@@ -142,6 +179,14 @@ class CustomerOrder {
 
     Instant getReadyForHandoffAt() {
         return readyForHandoffAt;
+    }
+
+    Instant getHandedOverAt() {
+        return handedOverAt;
+    }
+
+    Instant getPaymentWindowEndsAt() {
+        return paymentWindowEndsAt;
     }
 
     OrderLine getLine() {

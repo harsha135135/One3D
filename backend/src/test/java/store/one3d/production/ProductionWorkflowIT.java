@@ -57,11 +57,13 @@ class ProductionWorkflowIT {
     void anOrderGoesFromReleaseThroughADispatchedPrintAndQcToReadyForHandoff() throws Exception {
         String orderId = api.placeOrder();
 
-        api.post("/api/demo/orders/" + orderId + "/simulate-payment")
-                .andExpect(status().isOk())
+        api.pay(orderId);
+        api.get("/api/orders/" + orderId)
                 .andExpect(jsonPath("$.status").value("CONFIRMED"))
-                .andExpect(jsonPath("$.confirmationSource").value("DEMO_SIMULATED"))
+                .andExpect(jsonPath("$.confirmationSource").value("RAZORPAY_TEST"))
                 .andExpect(jsonPath("$.confirmedAt").value(notNullValue()));
+        // Payment alone starts nothing: the order waits for an operator to release it.
+        api.get("/api/ops/orders/" + orderId).andExpect(jsonPath("$.jobId").value(nullValue()));
 
         String released = api.post("/api/ops/orders/" + orderId + "/release")
                 .andExpect(status().isCreated())
@@ -106,6 +108,14 @@ class ProductionWorkflowIT {
                 .andExpect(jsonPath("$.readyForHandoffAt").value(notNullValue()));
         api.get("/api/orders/" + orderId)
                 .andExpect(jsonPath("$.status").value("READY_FOR_HANDOFF"));
+        api.post("/api/ops/orders/" + orderId + "/handed-over")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("HANDED_OVER"))
+                .andExpect(jsonPath("$.handedOverAt").value(notNullValue()));
+        // The customer's timeline, built from facts each step recorded.
+        api.get("/api/orders/" + orderId + "/timeline")
+                .andExpect(jsonPath("$[*].kind").value(contains("PLACED", "CONFIRMED", "RELEASED_TO_PRODUCTION",
+                        "QC_PASSED", "READY_FOR_HANDOFF", "HANDED_OVER")));
 
         api.clearBedRequest(printerId, attemptId)
                 .andExpect(status().isOk())

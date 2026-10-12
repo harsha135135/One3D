@@ -66,10 +66,17 @@ class ProductionTransitionsIT {
     }
 
     @Test
-    void paymentCanBeSimulatedOnlyOnce() throws Exception {
+    void anOrderIsHandedOverOnlyAfterItIsReadyAndOnlyOnce() throws Exception {
         String orderId = api.placeConfirmedOrder();
 
-        expectConflict(api.post("/api/demo/orders/" + orderId + "/simulate-payment"), "ORDER_NOT_AWAITING_PAYMENT");
+        expectConflict(api.post("/api/ops/orders/" + orderId + "/handed-over"), "ORDER_NOT_READY_FOR_HANDOFF");
+    }
+
+    @Test
+    void aPaidOrderCannotOpenAnotherCheckout() throws Exception {
+        String orderId = api.placeConfirmedOrder();
+
+        expectConflict(api.post("/api/orders/" + orderId + "/checkout"), "ORDER_NOT_AWAITING_PAYMENT");
     }
 
     @Test

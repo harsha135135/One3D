@@ -138,6 +138,11 @@ class QuotesIT {
         assertThat(scope.get("sha256")).isEqualTo(StlFixtures.sha256(model));
         assertThat(scope.get("recipe_quote_id").toString()).isEqualTo(quoteId);
         mvc.perform(get("/api/requests/{id}", requestId).with(alice)).andExpect(jsonPath("$.status").value("ORDERED"));
+        // The order can be paid only while the accepted quote would have been valid.
+        assertThat(jdbc.sql("""
+                        SELECT o.payment_window_ends_at = q.expires_at FROM customer_order o, quote q
+                        WHERE o.id = ?::uuid AND q.id = ?::uuid""")
+                .params(orderId, quoteId).query(Boolean.class).single()).isTrue();
     }
 
     @Test
@@ -321,16 +326,21 @@ class QuotesIT {
         String orderId = JsonPath.read(body, "$.id");
         String recipeId = JsonPath.read(body, "$.line.recipeRevisionId");
 
-        mvc.perform(post("/api/demo/orders/{id}/simulate-payment", orderId).with(alice)).andExpect(status().isOk());
+        api.pay(alice, orderId);
         String jobId = api.release(orderId);
         api.get("/api/ops/jobs/" + jobId).andExpect(jsonPath("$.recipeRevisionId").value(recipeId));
         String attemptId = api.startAttempt(jobId, printerId);
         api.complete(attemptId);
         api.qc(attemptId, "PASSED").andExpect(jsonPath("$.status").value("ACCEPTED"));
         api.post("/api/ops/orders/" + orderId + "/ready-for-handoff").andExpect(status().isOk());
+        api.post("/api/ops/orders/" + orderId + "/handed-over").andExpect(status().isOk());
+        mvc.perform(get("/api/orders/{id}/timeline", orderId).with(alice))
+                .andExpect(jsonPath("$[0].kind").value("PLACED"))
+                .andExpect(jsonPath("$[0].detail").value("From quote " + quoteId.substring(0, 8)))
+                .andExpect(jsonPath("$[-1].kind").value("HANDED_OVER"));
 
         mvc.perform(get("/api/orders/{id}", orderId).with(alice))
-                .andExpect(jsonPath("$.status").value("READY_FOR_HANDOFF"));
+                .andExpect(jsonPath("$.status").value("HANDED_OVER"));
     }
 
     // --- helpers -------------------------------------------------------------

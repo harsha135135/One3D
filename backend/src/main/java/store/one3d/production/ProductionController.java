@@ -44,6 +44,12 @@ class ProductionController {
         return productionService.markReadyForHandoff(orderId);
     }
 
+    /** The customer collected the part (only after ready for handoff). */
+    @PostMapping("/orders/{orderId}/handed-over")
+    OrderResponse markHandedOver(@PathVariable UUID orderId) {
+        return productionService.markHandedOver(orderId);
+    }
+
     @GetMapping("/jobs/{jobId}")
     JobResponse getJob(@PathVariable UUID jobId) {
         return productionService.getJob(jobId);

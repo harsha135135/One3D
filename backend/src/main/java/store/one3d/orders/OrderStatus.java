@@ -5,7 +5,7 @@ package store.one3d.orders;
  * separately on the production job and its attempts.
  *
  * <pre>
- * AWAITING_PAYMENT → CONFIRMED → READY_FOR_HANDOFF
+ * AWAITING_PAYMENT → CONFIRMED → READY_FOR_HANDOFF → HANDED_OVER
  * </pre>
  *
  * Adding a state needs a migration that extends the
@@ -16,5 +16,7 @@ public enum OrderStatus {
     /** Commercially eligible for production. Does not start production by itself. */
     CONFIRMED,
     /** The accepted part is ready to be handed to the customer. */
-    READY_FOR_HANDOFF
+    READY_FOR_HANDOFF,
+    /** An operator recorded that the customer received the part. */
+    HANDED_OVER
 }

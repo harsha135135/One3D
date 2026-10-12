@@ -5,6 +5,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import store.one3d.production.DispatchWorker;
 import store.one3d.production.ExecutionObserver;
 
@@ -12,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -49,11 +51,50 @@ public final class ApiSteps {
         return JsonPath.read(body, "$.id");
     }
 
-    /** Places an order and confirms it with the demo-only simulated payment. */
+    /** Places an order and pays it: a test-mode checkout, then a signed payment.captured webhook. */
     public String placeConfirmedOrder() throws Exception {
         String orderId = placeOrder();
-        post("/api/demo/orders/" + orderId + "/simulate-payment").andExpect(status().isOk());
+        pay(orderId);
         return orderId;
+    }
+
+    /** Pays an order of the default test user the way Razorpay reports it. Returns the provider payment id. */
+    public String pay(String orderId) throws Exception {
+        return pay(orderId, post("/api/orders/" + orderId + "/checkout"));
+    }
+
+    /** Pays a customer's own order: their checkout, then the signed webhook. */
+    public String pay(RequestPostProcessor customer, String orderId) throws Exception {
+        return pay(orderId, mvc.perform(MockMvcRequestBuilders.post("/api/orders/" + orderId + "/checkout").with(customer)));
+    }
+
+    private String pay(String orderId, ResultActions openedCheckout) throws Exception {
+        String checkout = openedCheckout.andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String providerOrderId = JsonPath.read(checkout, "$.providerOrderId");
+        long amount = ((Number) JsonPath.read(checkout, "$.amountMinor")).longValue();
+        String paymentId = RazorpayEvents.newPaymentId();
+        webhook(RazorpayEvents.captured(paymentId, providerOrderId, amount)).andExpect(status().isOk());
+        return paymentId;
+    }
+
+    /** Delivers a webhook body with a valid signature and a fresh event id, without a session. */
+    public ResultActions webhook(String body) throws Exception {
+        return webhook(body, RazorpayEvents.newEventId(), RazorpayEvents.sign(body));
+    }
+
+    public ResultActions webhook(String body, String eventId, String signature) throws Exception {
+        var request = MockMvcRequestBuilders.post("/api/payments/razorpay/webhook")
+                .with(anonymous())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body);
+        if (eventId != null) {
+            request.header("X-Razorpay-Event-Id", eventId);
+        }
+        if (signature != null) {
+            request.header("X-Razorpay-Signature", signature);
+        }
+        return mvc.perform(request);
     }
 
     /** Places, confirms and releases an order; returns the job id. */

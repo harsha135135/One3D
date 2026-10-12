@@ -97,8 +97,9 @@ class DatabaseConstraintsIT {
         // Since V3 a status past AWAITING_PAYMENT also needs confirmation
         // fields; they are set here so that only the status rule is broken.
         assertThatThrownBy(() -> jdbc.sql("""
-                        INSERT INTO customer_order (id, customer_id, status, created_at, confirmed_at, confirmation_source)
-                        VALUES (?, ?, 'SHIPPED', now(), now(), 'DEMO_SIMULATED')
+                        INSERT INTO customer_order (id, customer_id, status, created_at, confirmed_at, confirmation_source,
+                                                    payment_window_ends_at)
+                        VALUES (?, ?, 'SHIPPED', now(), now(), 'DEMO_SIMULATED', now() + interval '72 hours')
                         """)
                 .params(UUID.randomUUID(), TestUsers.LEGACY_CUSTOMER_ID)
                 .update())
@@ -108,7 +109,9 @@ class DatabaseConstraintsIT {
 
     private UUID insertOrder(String status) {
         UUID orderId = UUID.randomUUID();
-        jdbc.sql("INSERT INTO customer_order (id, customer_id, status, created_at) VALUES (?, ?, ?, ?)")
+        jdbc.sql("""
+                        INSERT INTO customer_order (id, customer_id, status, created_at, payment_window_ends_at)
+                        VALUES (?, ?, ?, ?, now() + interval '72 hours')""")
                 .params(orderId, TestUsers.LEGACY_CUSTOMER_ID, status, OffsetDateTime.now())
                 .update();
         return orderId;
