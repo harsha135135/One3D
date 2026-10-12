@@ -139,6 +139,21 @@ To restore the **live** database from a backup, for example after a bad migratio
 
 This is a single-instance demo with no replica. Anything written after the newest backup is lost when restoring.
 
+## Replacing the instance
+
+The instance is disposable; the data volume, the Elastic IP, the buckets, ECR and Cognito are not. To get a fresh instance (a broken root disk, a new Amazon Linux image), use the phases of [`replace-instance.sh`](../docs/evidence/2026-10-12-checkpoint-8/cloud/replace-instance.sh). It was used in Checkpoint 8, with `PLAN_FILE` set outside the repository because a saved plan holds sensitive values:
+
+1. **`prepare`:**
+   - `demo.sh stop` (a backup) and a snapshot of the data volume;
+   - termination protection off;
+   - a saved plan for `terraform apply -replace=aws_instance.demo`, which it refuses unless the only resources deleted are the instance and its volume attachment.
+2. **`apply`:**
+   - applies that plan and waits for the first boot. The boot script mounts the existing data volume and formats it only if it is empty;
+   - sets the GitHub variable `DEMO_INSTANCE_ID` to the new instance, and turns protection on again.
+3. **`deploy`:** deploys the current `main` commit. The certificate is reused from the data volume.
+
+Then check the site and a few records, run `terraform plan` (it should show no changes), and delete the snapshot.
+
 ## Destroying the demo
 
 1. Remove the GitHub repository variables (`gh variable delete …`), so a later push to `main` does not try to deploy.
@@ -147,6 +162,7 @@ This is a single-instance demo with no replica. Anything written after the newes
    ```bash
    terraform -chdir=infra/terraform/demo apply -var termination_protection=false
    ```
+   AWS can report the old value for about a minute after the change; check it with `aws ec2 describe-instance-attribute --attribute disableApiTermination` before step 4.
 4. Destroy the demo:
    ```bash
    terraform -chdir=infra/terraform/demo destroy

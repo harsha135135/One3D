@@ -1,0 +1,3 @@
+# Database rows on the new instance i-026fb29f6b8d6591a (15:37:01 UTC); before the replacement (restore-check.txt, 15:23 UTC):
+#   artifact=1 customer_order=6 order_fact=19 payment=5 payment_event=9 pending_work=3 print_attempt=2
+after:  artifact=1 customer_order=6 order_fact=19 payment=5 payment_event=9 pending_work=3 print_attempt=2

@@ -1,0 +1,11 @@
+nginx:   <client> [12/Oct/2026:15:17:51 +0000] "POST /api/payments/razorpay/webhook HTTP/1.1" 200 32 0.023 rid=5e8ceb32d5a7d5de42820c6516a9b480
+backend: {"level": "INFO", "request_id": "5e8ceb32d5a7d5de42820c6516a9b480", "message": "Webhook event Tn2ki1xLW1Wenl (payment.authorized) for payment pay_…: IGNORED"}
+
+nginx:   <client> [12/Oct/2026:15:17:52 +0000] "POST /api/payments/razorpay/webhook HTTP/1.1" 200 32 0.037 rid=521a9a5fbe57fbb2cf51c7bfcde4ea36
+backend: {"level": "INFO", "request_id": "521a9a5fbe57fbb2cf51c7bfcde4ea36", "message": "Payment pay_… confirmed order 3627d7c0-de6a-424d-bd11-340aedc1f178"}
+backend: {"level": "INFO", "request_id": "521a9a5fbe57fbb2cf51c7bfcde4ea36", "message": "Webhook event Tn2kiljRGxTf1m (payment.captured) for payment pay_…: APPLIED"}
+
+nginx:   <client> [12/Oct/2026:15:17:52 +0000] "POST /api/payments/razorpay/webhook HTTP/1.1" 200 41 0.015 rid=913d3082aba9e3fa99be34f9cd63628a
+backend: {"level": "INFO", "request_id": "913d3082aba9e3fa99be34f9cd63628a", "message": "Webhook event Tn2kj3qa9KN9Oa (order.paid) for payment pay_…: ALREADY_RECORDED"}
+
+

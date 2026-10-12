@@ -1,0 +1,66 @@
+signed in through Cognito (password + TOTP) as the demo operator: roles CUSTOMER, OPERATOR, payment mode RAZORPAY_TEST
+
+## 1. A paid order is released (15:19:01 UTC)
+order 3627d7c0: undefined
+job f1cb3838 released; printer bed clear
+one3d_simulator_unreachable_total:
+operation=dispatch 0
+  operation=observe 0
+one3d_dispatch_results_total:
+result=refused 0
+  result=started 0
+  result=unknown 0
+one3d_attempts_awaiting_reconciliation:
+0
+one3d_work_items{kind=DISPATCH_START} > 0:
+  (no series)
+API 5xx in the last 5 minutes:
+0
+
+## 2. Fault: the simulator stops (15:19:26 UTC); the operator starts the print
+on the instance: one3d-simulator-1 stopped
+attempt 9fc90382 recorded: START_INTENT
+after 45 s: attempt RECONCILIATION_REQUIRED
+one3d_simulator_unreachable_total:
+operation=dispatch 5
+  operation=observe 0
+one3d_dispatch_results_total:
+result=refused 0
+  result=started 0
+  result=unknown 5
+one3d_attempts_awaiting_reconciliation:
+1
+one3d_work_items{kind=DISPATCH_START} > 0:
+kind=DISPATCH_START,status=EXHAUSTED 1
+API 5xx in the last 5 minutes:
+0
+
+## 3. The backend's JSON log lines for that attempt (on the instance)
+{"time": "15:19:32", "level": "WARN", "message": "Start of attempt 9fc90382-a399-421e-9b4d-a970d877c034 not confirmed (command 1bd16179-e8d7-4359-a9b1-0a44d61e1796): Simulator did not answer: ConnectException", "attempt_id": "9fc90382-a399-421e-9b4d-a970d877c034", "command_id": "1bd16179-e8d7-4359-a9b1-0a44d61e1796", "job_id": "f1cb3838-00c6-4ea0-b4f8-a53ca1544b44"}
+  {"time": "15:19:34", "level": "WARN", "message": "Start of attempt 9fc90382-a399-421e-9b4d-a970d877c034 not confirmed (command 1bd16179-e8d7-4359-a9b1-0a44d61e1796): Simulator did not answer: ConnectException", "attempt_id": "9fc90382-a399-421e-9b4d-a970d877c034", "command_id": "1bd16179-e8d7-4359-a9b1-0a44d61e1796", "job_id": "f1cb3838-00c6-4ea0-b4f8-a53ca1544b44"}
+  {"time": "15:19:38", "level": "WARN", "message": "Start of attempt 9fc90382-a399-421e-9b4d-a970d877c034 not confirmed (command 1bd16179-e8d7-4359-a9b1-0a44d61e1796): Simulator did not answer: ConnectException", "attempt_id": "9fc90382-a399-421e-9b4d-a970d877c034", "command_id": "1bd16179-e8d7-4359-a9b1-0a44d61e1796", "job_id": "f1cb3838-00c6-4ea0-b4f8-a53ca1544b44"}
+  {"time": "15:19:46", "level": "WARN", "message": "Start of attempt 9fc90382-a399-421e-9b4d-a970d877c034 not confirmed (command 1bd16179-e8d7-4359-a9b1-0a44d61e1796): Simulator did not answer: ConnectException", "attempt_id": "9fc90382-a399-421e-9b4d-a970d877c034", "command_id": "1bd16179-e8d7-4359-a9b1-0a44d61e1796", "job_id": "f1cb3838-00c6-4ea0-b4f8-a53ca1544b44"}
+  {"time": "15:20:02", "level": "WARN", "message": "Start of attempt 9fc90382-a399-421e-9b4d-a970d877c034 not confirmed (command 1bd16179-e8d7-4359-a9b1-0a44d61e1796): Simulator did not answer: ConnectException", "attempt_id": "9fc90382-a399-421e-9b4d-a970d877c034", "command_id": "1bd16179-e8d7-4359-a9b1-0a44d61e1796", "job_id": "f1cb3838-00c6-4ea0-b4f8-a53ca1544b44"}
+start deliveries whose tries ran out (operator list): 1
+dashboard screenshot (through SSM port forwarding): grafana-during-fault.png
+
+## 4. Recovery: the simulator is back (15:21:34 UTC); the operator reconciles
+on the instance: one3d-simulator-1 started
+reconcile: RECONCILIATION_REQUIRED
+attempt: RUNNING
+simulator.sh complete: {"printerId":"0d3d0000-0000-4000-8000-000000000101","runningAttemptId":null,"bedState":"OCCUPIED","bedCycleAttemptId":"9fc90382-a399-421e-9b4d-a970d877c034","simulated":true}
+job AWAITING_QC; QC ACCEPTED; READY_FOR_HANDOFF; HANDED_OVER
+one3d_simulator_unreachable_total:
+operation=dispatch 5
+  operation=observe 0
+one3d_dispatch_results_total:
+result=refused 0
+  result=started 1
+  result=unknown 5
+one3d_attempts_awaiting_reconciliation:
+0
+one3d_work_items{kind=DISPATCH_START} > 0:
+  (no series)
+API 5xx in the last 5 minutes:
+0
+dashboard screenshot (through SSM port forwarding): grafana-after-recovery.png

@@ -1,0 +1,37 @@
+
+## 6. Apply the saved plan (15:27:12 UTC)
+aws_volume_attachment.data: Destroying... [id=vai-961854906]
+aws_instance.demo: Destroying... [id=i-08b860e0cf0061856]
+aws_instance.demo: Creating...
+aws_instance.demo: Creation complete after 13s [id=i-026fb29f6b8d6591a]
+aws_volume_attachment.data: Creating...
+aws_eip.demo: Modifying... [id=eipalloc-093e27ae8e85c3f99]
+aws_iam_role_policy.github_deploy: Modifying... [id=one3d-demo-github-deploy:one3d-demo-push-and-deploy]
+aws_iam_role_policy.github_deploy: Modifications complete after 1s [id=one3d-demo-github-deploy:one3d-demo-push-and-deploy]
+aws_eip.demo: Modifications complete after 2s [id=eipalloc-093e27ae8e85c3f99]
+aws_volume_attachment.data: Creation complete after 21s [id=vai-643177957]
+Apply complete! Resources: 2 added, 2 changed, 2 destroyed.
+old instance i-08b860e0cf0061856: terminated
+new instance: i-026fb29f6b8d6591a	running	2026-10-12T15:27:37+00:00	ami-08e3b3155fc937a94	13.234.148.122
+
+## 7. Wait for the first boot (SSM online and the boot script finished) (15:28:12 UTC)
+  status: done
+  /dev/nvme1n1 xfs
+  letsencrypt
+  postgres
+  simulator
+  postgres files: 24, PG_VERSION 17
+  certificate: README demo.one3d.store
+  Docker version 25.0.14, build 0bab007
+  5.6.0
+  /swapfile 1024M
+  
+
+## 8. GitHub deploys to the new instance (15:30:39 UTC)
+DEMO_INSTANCE_ID: i-026fb29f6b8d6591a
+
+## 9. Termination protection on again (15:30:41 UTC)
+  # aws_instance.demo will be updated in-place
+Apply complete! Resources: 0 added, 1 changed, 0 destroyed.
+disableApiTermination: False
+(termination protection: the check right after the apply read False; AWS reported True about a minute later, after one more identical apply)

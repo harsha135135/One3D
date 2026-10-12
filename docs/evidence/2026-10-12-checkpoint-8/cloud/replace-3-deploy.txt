@@ -1,0 +1,8 @@
+
+## 10. Deploy main (41f85c5b261bd02a3b048082bdccbd3ac606f18e) to the new instance (15:34:01 UTC)
+run 38271179385: success
+  Certificate not yet due for renewal
+  Deployed 41f85c5b261bd02a3b048082bdccbd3ac606f18e (previous: none)
+  Deploy status: Success
+site: HTTP 200
+deleted snap-0d8dc0897d6150c53 at 15:39:01 UTC, after the checks on the new instance passed

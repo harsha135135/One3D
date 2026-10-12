@@ -1,0 +1,3 @@
+  # aws_ssm_parameter.grafana_admin_password will be created
+  # random_password.grafana_admin will be created
+Plan: 2 to add, 0 to change, 0 to destroy.
