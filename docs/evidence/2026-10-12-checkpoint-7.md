@@ -46,7 +46,7 @@ The CI result for this part's final commit is linked from its pull request.
 
 | Demonstration | Result | Evidence |
 |---|---|---|
-| Start from a clean checkout using documented steps | A fresh clone of the branch (no `.env`, nothing untracked) ran `docker compose up -d --build` as the README says. All services were healthy and the site was on `http://localhost:8088`. Then: a customer order, the demo shortcut, an operator release, a print on the simulator, QC, ready and handed over; a file uploaded through the local `/s3` route and VERIFIED | [`local/clean-checkout.txt`](2026-10-12-checkpoint-7/local/clean-checkout.txt) ([script](2026-10-12-checkpoint-7/local/clean-checkout.sh)) |
+| Start from a clean checkout using documented steps | A fresh clone (no `.env`, nothing untracked) ran `docker compose up -d --build` as the README says. It was cloned from the local repository at `3cf5302`, not from GitHub as the README's command does; the content is the same commit. All services were healthy and the site was on `http://localhost:8088`. Then: a customer order, the demo shortcut, an operator release, a print on the simulator, QC, ready and handed over; a file uploaded through the local `/s3` route and VERIFIED | [`local/clean-checkout.txt`](2026-10-12-checkpoint-7/local/clean-checkout.txt) ([script](2026-10-12-checkpoint-7/local/clean-checkout.sh)) |
 | Replace containers without losing expected records | **Locally:** all 8 containers recreated; the order (HANDED_OVER, 6 timeline facts) and the file (VERIFIED) were still there. **On AWS:** all 5 containers recreated from their images; database rows the same before and after (orders=1, artifacts=1, facts=1); the order and file read again through the site after signing in anew | [`local/clean-checkout.txt`](2026-10-12-checkpoint-7/local/clean-checkout.txt) §6; [`cloud/replace-containers.txt`](2026-10-12-checkpoint-7/cloud/replace-containers.txt), [`cloud/recheck-after-recreate.txt`](2026-10-12-checkpoint-7/cloud/recheck-after-recreate.txt) |
 | Block promotion when a required test fails | Draft PR #9 changed one expected value. Backend tests failed, the Images job was **skipped**, and Deploy was skipped. "Deploy a commit" on `main` with that SHA failed at "The commit's CI run on main passed" before requesting AWS credentials. Started from the PR branch, the deploy job was skipped. PR #9 was closed unmerged | [`local/promotion-blocked.txt`](2026-10-12-checkpoint-7/local/promotion-blocked.txt) |
 | Deploy a known image revision and document how to revert it | CI deployed the images tagged `70ef808…` (ECR tags are immutable); the instance records `/opt/one3d/deployed-tag` and `previous-tag`. The revert procedure, including what a rollback across a database migration means, is in the runbook. **A revert has not been run yet**: only one revision exists in ECR until this part merges | [`cloud/stop-start.txt`](2026-10-12-checkpoint-7/cloud/stop-start.txt) ("Deployed 70ef808…"), [`infra/README.md`](../infra/README.md#daily-use) |
@@ -87,7 +87,7 @@ All runs used the synthetic demo users and Razorpay test mode. Output: [`cloud/p
   - During Checkout there was one violation: Checkout.js loads Razorpay's risk-detection script from `cdn.razorpay.com`, which `script-src` did not allow. The payment still succeeded.
   - Part 2 adds `https://cdn.razorpay.com` to `script-src` (`1b6a4e1`). Razorpay's Checkout script from `checkout.razorpay.com` already runs in the page, so this trusts no new party.
   - The changed policy was tried on the live site before deploying it: the order page was served with the new header, and a second test payment (order `0c0eeff4`) showed **0 violations** (`pay-candidate-csp.txt`). It is deployed when this part merges.
-- **Real webhook delivery: pending.** It waits for the owner to add the webhook in Razorpay's dashboard (test mode). Both payments above found no webhook events within 60 s, as expected while none is configured. The check is the `pay-webhook` part of the same script: a `payment.captured` or `order.paid` event recorded as APPLIED or ALREADY_RECORDED, which requires a valid signature and the `X-Razorpay-Event-Id` header.
+- **Real webhook delivery: verified afterwards; see the addendum.** At the time it was waiting for the owner to add the webhook in Razorpay's dashboard (test mode). Both payments above found no webhook events within 60 s, as expected while none is configured. The check is the `pay-webhook` part of the same script: a `payment.captured` or `order.paid` event recorded as APPLIED or ALREADY_RECORDED, which requires a valid signature and the `X-Razorpay-Event-Id` header.
 
 ## 5. Stop and start, and data
 
@@ -137,9 +137,9 @@ All runs used the synthetic demo users and Razorpay test mode. Output: [`cloud/p
 
 ## Owed
 
-- **Real webhook delivery** from Razorpay to the deployed site. This needs the dashboard webhook; see §4.
-- **A rollback run** with "Deploy a commit": from the merged revision back to `70ef808`, then forward again. It needs this part merged, so that two revisions exist in ECR.
-- **The CSP change deployed and checked** on the site after the merge.
+- ~~Real webhook delivery from Razorpay~~: done; see the addendum.
+- **A rollback run** with "Deploy a commit" that changes what serves the site. The first attempt found a deploy defect (addendum); it is repeated after the fix is deployed.
+- **The CSP change live and checked** on the site, which needs the same fix.
 
 ## Known limitations
 
@@ -149,3 +149,30 @@ All runs used the synthetic demo users and Razorpay test mode. Output: [`cloud/p
 - **About 15 seconds of 502 after every start or backend replacement,** while the JVM starts. There is no second instance.
 - **Cognito MFA is set for the whole pool,** so demo customers also need an authenticator app.
 - **While stopped, the demo costs about $0.18 a day** for the Elastic IP and the disks. Only destroying it stops that.
+- **Razorpay retries a webhook it could not deliver and disables it after about a day of failures.** While the demo is stopped, deliveries fail. Do not stop the demo in the minutes after a payment, and after a long stop check in the dashboard that the webhook is still enabled. A payment whose webhook never arrived is still confirmed by the order page's own check with Razorpay.
+
+## Addendum: after PR #10 merged (2026-10-12, 10:27–10:41 UTC)
+
+PR #10 merged as `dc26125`. CI on `main` ([run 38236403998](https://github.com/harsha135135/One3D/actions/runs/38236403998)) passed, pushed the images and skipped the deploy, because the demo was stopped. `demo.sh start` (10:31 UTC) then redeployed `70ef808` and deployed `dc26125`.
+
+**Real webhook delivery from Razorpay: verified.** [`cloud/pay-webhook.txt`](2026-10-12-checkpoint-7/cloud/pay-webhook.txt), [`cloud/webhook-event-ids.txt`](2026-10-12-checkpoint-7/cloud/webhook-event-ids.txt)
+- **The payment:** with the owner's test-mode webhook in place, the customer paid order `756cf6bf` in hosted Checkout.
+- **Razorpay delivered three signed events within seconds:**
+  - `payment.authorized` was IGNORED, because an authorization alone never confirms;
+  - `payment.captured` was **APPLIED**, and the payment is recorded with source **WEBHOOK**. The webhook arrived before the order page's own check;
+  - `order.paid` was ALREADY_RECORDED.
+- **Event ids:** each delivery stored its `X-Razorpay-Event-Id`, and the endpoint refuses a delivery without one.
+- **The order** is CONFIRMED by `RAZORPAY_TEST`.
+- **CSP:** the old policy's one violation (Razorpay's risk-detection script) appeared again, because the CSP change was not live; see below.
+
+**The first rollback run found a deploy defect.** [`cloud/rollback-first-run.txt`](2026-10-12-checkpoint-7/cloud/rollback-first-run.txt), [`cloud/nginx-not-recreated.txt`](2026-10-12-checkpoint-7/cloud/nginx-not-recreated.txt)
+- **What differs between the revisions:** `dc26125` and `70ef808` have byte-identical images (same digests in all three repositories), and no migration lies between them. They differ only in the deploy bundle's Nginx template (the CSP).
+- **The run itself:** `deploy.yml` deployed `dc26125`, then `70ef808`, then `dc26125`. Each run was green, and the instance's `deployed-tag` and `previous-tag` followed.
+- **The site never changed:** it served the `70ef808` policy throughout.
+  - Nginx renders its templates only when its container starts, and Compose recreates a container only when its own configuration changes.
+  - So a deploy that changed only the templates left the old configuration running, while recording the new commit as deployed.
+- **The first version of the check missed it.** It looked for `cdn.razorpay.com` anywhere in the header, and `img-src` allows it in both revisions. The check now reads `script-src`, Nginx's rendered config and the container's start time.
+- **Fix (this follow-up):** Nginx is labelled with a hash of its templates (set by `deploy.sh`), so a deploy that changes them recreates Nginx. A bundle without the label, such as `70ef808`'s, also recreates it. This was checked locally with Compose: the same hash leaves the container running, a new hash recreates it with the new template, and removing the label recreates it.
+- **After this follow-up merges,** the rollback run is repeated (to `70ef808` and forward again), and the CSP change is checked live. Until then, Checkpoint 7's rollback item stays owed.
+
+**Runtime:** 10:31–10:40 UTC, then stopped again with a backup.

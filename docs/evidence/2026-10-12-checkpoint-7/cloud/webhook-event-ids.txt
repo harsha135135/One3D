@@ -1,0 +1,5 @@
+# The stored X-Razorpay-Event-Id of each delivery for the pay-webhook order (shortened); the endpoint refuses a delivery without one
+payment.authorized | Tmy0… (14 chars) | IGNORED
+payment.captured | Tmy0… (14 chars) | APPLIED
+order.paid | Tmy0… (14 chars) | ALREADY_RECORDED
+
