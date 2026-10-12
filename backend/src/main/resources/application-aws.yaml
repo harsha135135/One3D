@@ -1,0 +1,26 @@
+# The deployed demo on AWS (Checkpoint 7): everything that differs from local
+# development. Values that name AWS resources and all secrets come from the
+# environment (rendered from SSM Parameter Store on the instance), never from
+# this file. DeploymentGuard refuses to start with local or mock settings.
+server:
+  # Behind Nginx on the internal Docker network: honour X-Forwarded-Proto and
+  # -Host from the proxy, so redirects and cookies use https and the public host.
+  forward-headers-strategy: native
+  servlet:
+    session:
+      cookie:
+        # HTTPS only.
+        secure: true
+
+one3d:
+  identity:
+    # Cognito puts group membership in this claim.
+    groups-claim: cognito:groups
+  storage:
+    # Real S3: no endpoint override, virtual-hosted URLs, and the instance
+    # role's credentials (default provider chain) instead of static keys.
+    endpoint: ""
+    public-endpoint: ""
+    path-style: false
+    access-key: ""
+    secret-key: ""

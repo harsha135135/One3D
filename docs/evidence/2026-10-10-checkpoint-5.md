@@ -182,7 +182,7 @@ Screenshots: [`screenshots/`](2026-10-10-checkpoint-5/screenshots/).
 - **Test failure output can contain presigned URLs.**
   - When a MockMvc request in a failing test returns a redirect, Spring prints the response, including the `Location` header.
   - These URLs point at a throwaway test container, are signed with the dummy `local-dev-only` key and expire within minutes. The application itself never logs them.
-- **Abandoned uploads.** Files left `UPLOAD_PENDING` after their 15-minute window are not removed by the application. The S3 lifecycle rule for `uploads/` (incomplete or noncurrent objects) is part of the CP7 Terraform. S3Mock keeps everything.
+- **Abandoned uploads.** Files left `UPLOAD_PENDING` after their 15-minute window are not removed by the application. S3Mock keeps everything. **Corrected 2026-10-12:** this record first said a CP7 lifecycle rule would remove incomplete or noncurrent objects under `uploads/`. Expiring noncurrent versions would delete pinned files, so the CP7 bucket only aborts incomplete multipart uploads, and abandoned objects remain until the demo is destroyed (see decision 0001).
 - **Finalize must happen within the upload window.** A very slow 20 MB upload that ends after 15 minutes must be uploaded again.
 - **A file check whose tries run out leaves the file `VERIFYING`.** It is listed on the Operations page with a retry button (`POST /api/ops/files/{id}/retry-verification`).
 - **The check is structural only.** It covers the binary layout or ASCII markers and the SHA-256. There is no geometry, manifold or printability analysis; preparation and slicing stay manual, outside the application, as V1 scope says.

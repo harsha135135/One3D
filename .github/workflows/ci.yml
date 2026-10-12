@@ -1,5 +1,10 @@
 # Checks every pull request and every push to main. A PR is merged only after
-# all jobs pass. Image builds and deployment are added in Checkpoint 7.
+# all jobs pass. Every run also builds the three images (x86, as on the demo
+# instance). On a push to main, and only after every test job has passed, the
+# images are pushed to ECR tagged with the commit SHA (tags are immutable) and
+# that commit is deployed to the demo through SSM. AWS access uses GitHub's
+# OIDC token and a role that only main can assume; no AWS keys are stored here.
+# The jobs that need AWS are skipped until the repository variables exist.
 name: CI
 
 on:
@@ -82,3 +87,82 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           npm run test:e2e
+
+  images:
+    name: Images (built on every run; pushed to ECR from main)
+    needs: [simulator, backend, frontend]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ROLE_ARN != '' }}
+      REGISTRY: ${{ vars.ECR_REGISTRY || 'one3d' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v4
+      - name: AWS credentials (OIDC, main only)
+        if: env.PUSH == 'true'
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Log in to ECR
+        if: env.PUSH == 'true'
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Backend image
+        uses: docker/build-push-action@v7
+        with:
+          context: backend
+          push: ${{ env.PUSH == 'true' }}
+          provenance: false
+          tags: ${{ env.REGISTRY }}/one3d-backend:${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+      - name: Frontend image
+        uses: docker/build-push-action@v7
+        with:
+          context: frontend
+          push: ${{ env.PUSH == 'true' }}
+          provenance: false
+          tags: ${{ env.REGISTRY }}/one3d-frontend:${{ github.sha }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
+      - name: Simulator image
+        uses: docker/build-push-action@v7
+        with:
+          context: simulator
+          push: ${{ env.PUSH == 'true' }}
+          provenance: false
+          tags: ${{ env.REGISTRY }}/one3d-simulator:${{ github.sha }}
+          cache-from: type=gha,scope=simulator
+          cache-to: type=gha,scope=simulator,mode=max
+      - name: Deploy bundle (Compose files, Nginx, deploy script) to S3
+        if: env.PUSH == 'true'
+        run: |
+          tar -czf "$RUNNER_TEMP/bundle.tar.gz" compose.yaml compose.deploy.yaml infra/nginx/bootstrap infra/nginx/https infra/deploy
+          aws s3 cp "$RUNNER_TEMP/bundle.tar.gz" "s3://${{ vars.OPS_BUCKET }}/deploy/${{ github.sha }}.tar.gz" --only-show-errors
+
+  deploy:
+    name: Deploy to the demo (main only)
+    needs: images
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ROLE_ARN != ''
+    runs-on: ubuntu-24.04
+    # One deploy at a time; a newer push waits rather than cancelling one in progress.
+    concurrency:
+      group: deploy-demo
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Deploy this commit through SSM
+        env:
+          DEMO_INSTANCE_ID: ${{ vars.DEMO_INSTANCE_ID }}
+          OPS_BUCKET: ${{ vars.OPS_BUCKET }}
+        run: infra/deploy/remote-deploy.sh "${{ github.sha }}"

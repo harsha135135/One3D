@@ -27,7 +27,7 @@ Options checked on 2026-10-09 and 2026-10-10:
 - **Upload keys.** Every upload gets a random key under `uploads/`.
 - **Abandoned uploads:**
   - Files never finalized stay `UPLOAD_PENDING` after their 15-minute window and are never used.
-  - Their objects, and noncurrent versions that no revision references, are removed by an S3 lifecycle rule on `uploads/`. That rule is part of the Checkpoint 7 Terraform.
+  - Their objects stay in the bucket until the demo environment is destroyed. **Corrected 2026-10-12 (Checkpoint 7):** this record first said a lifecycle rule would remove noncurrent versions that no revision references. S3 lifecycle rules cannot see which versions are referenced, and expiring noncurrent versions would delete pinned files after a customer uploads again to the same key. The Terraform therefore only aborts incomplete multipart uploads. Removing unreferenced objects would need an application-side job (V2).
   - Locally, S3Mock keeps everything.
 
 ## Consequences

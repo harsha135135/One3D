@@ -1,0 +1,16 @@
+# First start on AWS, before a certificate exists: answer Let's Encrypt's
+# HTTP-01 challenge and nothing else. deploy.sh switches to https/ afterwards.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${ONE3D_DOMAIN};
+    server_tokens off;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 503 "HTTPS is being set up.\n";
+    }
+}

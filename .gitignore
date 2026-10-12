@@ -11,3 +11,9 @@ target/
 .env
 .env.*
 !.env.example
+
+# Terraform: local working files and state (state lives in S3)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan

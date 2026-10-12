@@ -1,0 +1,50 @@
+#!/bin/bash
+# First boot of the demo instance: the data volume (formatted only if empty,
+# mounted by its volume id), Docker (started only after that mount exists, so
+# PostgreSQL never initialises an empty database on the root disk), the Compose
+# plugin (checksum verified), 1 GiB of swap as a safety margin, and the
+# application directory. The application arrives later through deploy.sh.
+set -euxo pipefail
+
+# --- data volume ---------------------------------------------------------------
+data_device="${data_device}"
+for i in $(seq 1 60); do [ -e "$data_device" ] && break; sleep 5; done
+[ -e "$data_device" ] || { echo "The data volume is not attached" >&2; exit 1; }
+if ! blkid "$data_device"; then
+  mkfs.xfs -L one3d-data "$data_device"
+fi
+install -d -m 0755 /opt/one3d/data
+uuid=$(blkid -s UUID -o value "$data_device")
+grep -q "$uuid" /etc/fstab || echo "UUID=$uuid /opt/one3d/data xfs defaults,nofail 0 2" >> /etc/fstab
+systemctl daemon-reload
+mount -a
+mountpoint -q /opt/one3d/data
+install -d -m 0700 /opt/one3d/data/postgres /opt/one3d/data/letsencrypt
+install -d -m 0700 -o 10001 /opt/one3d/data/simulator
+
+# --- Docker, which needs the data volume ------------------------------------------
+dnf install -y docker
+install -d /etc/systemd/system/docker.service.d
+printf '[Unit]\nRequiresMountsFor=/opt/one3d/data\n' > /etc/systemd/system/docker.service.d/one3d-data.conf
+systemctl daemon-reload
+systemctl enable --now docker
+
+plugin=/usr/libexec/docker/cli-plugins/docker-compose
+base=https://github.com/docker/compose/releases/download/${compose_version}
+mkdir -p "$(dirname "$plugin")"
+curl -fsSL -o /tmp/docker-compose "$base/docker-compose-linux-x86_64"
+curl -fsSL -o /tmp/docker-compose.sha256 "$base/docker-compose-linux-x86_64.sha256"
+echo "$(cut -d' ' -f1 /tmp/docker-compose.sha256)  /tmp/docker-compose" | sha256sum -c -
+install -m 0755 /tmp/docker-compose "$plugin"
+
+# --- swap and the application directory ---------------------------------------------
+if [ ! -f /swapfile ]; then
+  fallocate -l 1G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+install -d -m 0700 /opt/one3d
+install -d -m 0755 /opt/one3d/app
+echo "${region}" > /opt/one3d/region
