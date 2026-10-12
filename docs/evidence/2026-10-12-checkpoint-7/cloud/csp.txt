@@ -1,0 +1,11 @@
+signed in through Cognito (password + TOTP) as the demo customer: roles CUSTOMER, payment mode RAZORPAY_TEST
+  /: 0 CSP violations
+  /requests/new: 0 CSP violations
+  /orders: 0 CSP violations
+  /orders/<order>: 0 CSP violations
+  /requests: 0 CSP violations
+signed in through Cognito (password + TOTP) as the demo operator: roles CUSTOMER, OPERATOR, payment mode RAZORPAY_TEST
+  /ops: 0 CSP violations
+  /ops/printers: 0 CSP violations
+  /ops/requests: 0 CSP violations
+  /ops/payments: 0 CSP violations

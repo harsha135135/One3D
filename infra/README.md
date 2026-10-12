@@ -11,7 +11,7 @@ infra/
     demo/       the demo environment (state in the bootstrap bucket)
   nginx/      local, bootstrap (first certificate) and https configurations
   deploy/     deploy.sh (on the instance), remote-deploy.sh (in CI), simulator.sh
-  ops/        demo.sh: start, stop, status
+  ops/        demo.sh: start, stop, status; demo-users.sh: the synthetic sign-in users
 ```
 
 ## Identity
@@ -34,7 +34,7 @@ The owner sets the user's console password and MFA device in the console, withou
 
 It is used through `aws login --profile one3d-deployer --region ap-south-1`, run in a terminal where it can wait for the browser. First sign out of any root console session, or `aws login` reuses it and stores root credentials under that profile. Check with `aws sts get-caller-identity --profile one3d-deployer`, which must show `user/one3d-deployer`. Every command below runs as this user.
 
-**GitHub Actions** never uses this user. It assumes `one3d-demo-github-deploy` through OIDC, from the `main` branch only.
+**GitHub Actions** never uses this user. It assumes `one3d-demo-github-deploy` through OIDC, from the `main` branch only. The role trusts the token subject `repo:harsha135135@<owner id>/One3D@<repository id>:ref:refs/heads/main`, which is the form this repository's tokens use. It contains GitHub's numeric ids, so a different repository later created under the same name cannot match it. The prefix is the Terraform variable `github_oidc_subject_prefix`. If the role cannot be assumed, check the `sub` of a token (the error names it) against that variable.
 
 ## First-time setup
 
@@ -57,16 +57,19 @@ It is used through `aws login --profile one3d-deployer --region ap-south-1`, run
    - the same secret
    - events `payment.captured`, `order.paid`, `payment.authorized` and `payment.failed`
 7. Account budgets, run once: `ALERT_EMAIL=<address> infra/account/budgets.sh`.
+8. Synthetic demo users: `infra/ops/demo-users.sh customer` and `infra/ops/demo-users.sh operator`. Each creates the user in Cognito, enrols an authenticator and stores the email, password and TOTP secret as a SecureString in `/one3d/demo-users/<role>`, without printing them. To sign in by hand, read the parameter with `--with-decryption` and add its `totp_uri` to an authenticator app. Running the script again resets the user.
 
 ## Daily use
 
 | Task | Command |
 |---|---|
-| Start the demo | `infra/ops/demo.sh start`. Starts the instance, redeploys (renewing the certificate if due), checks the site, then deploys the latest passing commit if it is newer |
+| Start the demo | `infra/ops/demo.sh start`. Starts the instance, redeploys (renewing the certificate if due), checks the site, then deploys the latest passing commit if it is newer. It takes about 75 seconds; for the last 15 or so the site answers 502 while the backend starts |
 | Stop the demo | `infra/ops/demo.sh stop`. Backs the database up to the ops bucket, stops the containers cleanly, then stops the instance |
 | Check it | `infra/ops/demo.sh status` |
 | Finish a simulated print | `bash /opt/one3d/app/infra/deploy/simulator.sh complete`, on the instance through SSM. The simulator's controls are reachable only on its internal network |
-| Roll back | Actions → "Deploy a commit" with an earlier commit SHA on `main` whose CI passed |
+| Roll back | See below |
+
+**Rolling back** to an earlier commit: Actions → "Deploy a commit" with that commit's full SHA (`gh workflow run deploy.yml --ref main -f sha=<sha>`). The workflow checks that the commit's CI run on `main` passed and that its images are in ECR, then deploys those exact images. `/opt/one3d/previous-tag` on the instance records what was running before. A rollback replaces the images only, not the database. If a newer commit added a Flyway migration, the older code starts against the newer schema (by default Flyway ignores applied migrations newer than the code), and whether that works depends on the change. Then either deploy a fix forward or restore the backup taken before that deploy into a fresh database. Check `backend/src/main/resources/db/migration` between the two commits before rolling back.
 
 **What survives a stop, a start and even replacing the instance:**
 - the database, the simulator journal and the TLS certificates, on the separate encrypted 4 GB data volume;
@@ -91,7 +94,7 @@ It is used through `aws login --profile one3d-deployer --region ap-south-1`, run
    terraform -chdir=infra/terraform/demo destroy
    ```
    This deletes the instance, both volumes, the Elastic IP, both buckets with their files, ECR, Cognito, the parameters, the IAM roles and the GitHub OIDC provider.
-5. Remove Razorpay's keys and anything else left under `/one3d/`:
+5. Remove Razorpay's keys, the demo users' sign-in details (`/one3d/demo-users/*`) and anything else left under `/one3d/`:
    ```bash
    aws ssm delete-parameters --names …
    ```

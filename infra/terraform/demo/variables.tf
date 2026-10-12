@@ -34,10 +34,16 @@ variable "termination_protection" {
   default     = true
 }
 
-variable "github_repository" {
-  description = "owner/name of the repository whose main branch may push images and deploy."
+variable "github_oidc_subject_prefix" {
+  description = <<-EOT
+    Subject prefix of GitHub's OIDC tokens for the repository whose main branch
+    may push images and deploy. This repository uses GitHub's immutable subject
+    format, owner@owner-id/repository@repository-id, so a renamed or recreated
+    repository with the same name cannot match. Read it with:
+    gh api repos/<owner>/<repo>/actions/oidc/customization/sub (sub_claim_prefix).
+  EOT
   type        = string
-  default     = "harsha135135/One3D"
+  default     = "repo:harsha135135@198421406/One3D@1392957710"
 }
 
 variable "compose_version" {

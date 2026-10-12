@@ -1,0 +1,36 @@
+## 1. The running stack and its memory (t3.small, 2 GiB)
+deployed: 70ef808b5fb6
+backend Up 9 minutes (healthy) 8080/tcp
+db Up 9 minutes (healthy) 5432/tcp
+frontend Up 9 minutes (healthy) 3000/tcp
+nginx Up 8 minutes 0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+simulator Up 9 minutes (healthy) 8090/tcp
+               total        used        free      shared  buff/cache   available
+Mem:            1909         837          77          48         994         846
+one3d-nginx-1 5.422MiB / 64MiB 0.00%
+one3d-backend-1 339.3MiB / 640MiB 0.31%
+one3d-simulator-1 48.2MiB / 192MiB 32.03%
+one3d-db-1 60.14MiB / 256MiB 0.64%
+one3d-frontend-1 96.06MiB / 192MiB 0.00%
+/dev/nvme0n1p1   12G  4.0G  8.0G  34% /
+/dev/nvme1n1    4.0G  110M  3.9G   3% /opt/one3d/data
+rows before: orders=1 artifacts=1 facts=1
+
+## 2. Recreate every container from its image
+1  Container one3d-backend-1 Recreated 
+1  Container one3d-backend-1 Started 
+1  Container one3d-db-1 Recreated 
+1  Container one3d-db-1 Started 
+1  Container one3d-frontend-1 Recreated 
+1  Container one3d-frontend-1 Started 
+1  Container one3d-nginx-1 Recreated 
+1  Container one3d-nginx-1 Started 
+1  Container one3d-simulator-1 Recreated 
+1  Container one3d-simulator-1 Started 
+backend Up 22 seconds (healthy)
+db Up 28 seconds (healthy)
+frontend Up 27 seconds (healthy)
+nginx Up 21 seconds
+simulator Up 28 seconds (healthy)
+rows after: orders=1 artifacts=1 facts=1
+

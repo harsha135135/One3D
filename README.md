@@ -45,7 +45,7 @@ These are planned choices, not claims of hands-on experience. The [scope](docs/v
 
 ## Run it locally
 
-These commands were run between 2026-10-07 and 2026-10-12; results are in the [Checkpoint 1](docs/evidence/2026-10-07-checkpoint-1.md), [2](docs/evidence/2026-10-09-checkpoint-2.md), [3](docs/evidence/2026-10-09-checkpoint-3.md), [4](docs/evidence/2026-10-09-checkpoint-4.md), [5](docs/evidence/2026-10-10-checkpoint-5.md) and [6](docs/evidence/2026-10-12-checkpoint-6.md) evidence.
+These commands were run between 2026-10-07 and 2026-10-12; results are in the [Checkpoint 1](docs/evidence/2026-10-07-checkpoint-1.md), [2](docs/evidence/2026-10-09-checkpoint-2.md), [3](docs/evidence/2026-10-09-checkpoint-3.md), [4](docs/evidence/2026-10-09-checkpoint-4.md), [5](docs/evidence/2026-10-10-checkpoint-5.md), [6](docs/evidence/2026-10-12-checkpoint-6.md) and [7](docs/evidence/2026-10-12-checkpoint-7.md) evidence.
 
 **Prerequisites:** JDK 21 (checked with 21.0.12; point `JAVA_HOME` at it if your default JDK differs), Node 24 LTS for the frontend (`frontend/.nvmrc`) and a running Docker daemon. Maven is not required: use the included `./mvnw` wrapper.
 
@@ -75,6 +75,25 @@ docker compose up -d --build db simulator idp storage storage-init
 # 4. In another terminal, start the frontend and open http://localhost:3000
 (cd frontend && npm ci && npm run dev)
 ```
+
+### The whole stack in containers
+
+From a clean checkout, with only Git and Docker installed:
+
+```bash
+git clone https://github.com/harsha135135/One3D.git && cd One3D
+docker compose up -d --build   # PostgreSQL, simulator, mock identity provider, storage,
+                               # backend, frontend and Nginx; the first build takes a few minutes
+# then open http://localhost:8088
+```
+
+These are the images that run on AWS, behind a local Nginx with the deployed routing, published on 127.0.0.1 only. The backend uses the demo payment shortcut, so no keys are needed. Sign in as described below. Recreating the containers (`docker compose up -d --force-recreate`) or stopping them (`docker compose stop`) keeps the data in Docker volumes; `docker compose down -v` deletes it. This uses the same ports as the steps above, so run one or the other.
+
+### The deployed demo
+
+[https://demo.one3d.store](https://demo.one3d.store) runs on demand and is usually stopped to save credits, so it may not answer. It runs the same images behind Nginx with a Let's Encrypt certificate, with sign-in through Amazon Cognito (an authenticator app is required) and payments in Razorpay test mode. How it is built, deployed, started, stopped and destroyed is in [infra/README.md](infra/README.md); the decision and its costs are in [decision 0003](docs/decisions/0003-aws-demo-deployment.md).
+
+### Using it
 
 Sign in with **any username** on the mock provider's form. Usernames starting with `operator` (for example `operator-1`) get the operator role and the Operations pages; any other name is a customer. The frontend forwards `/api`, `/oauth2`, `/login` and `/logout` to the backend, so the session and CSRF cookies stay on one origin. It also forwards `/s3` to the local storage, so the browser uploads and downloads model files with presigned URLs on the same origin (on AWS the browser talks to S3 directly).
 
@@ -142,7 +161,7 @@ curl -s -X POST http://127.0.0.1:8080/api/orders \
 
 More requests, including invalid ones, are in [`backend/api.http`](backend/api.http). Errors are `application/problem+json` responses with a stable `code` (for example `VALIDATION_FAILED`, `CONFIGURATION_NOT_ORDERABLE` or `ORDER_NOT_FOUND`).
 
-Locally, every service listens on 127.0.0.1 (the identity provider on localhost) and is never published to other machines. The HTTPS proxy and the public demo come in Checkpoint 7, where Cognito replaces the mock identity provider.
+Locally, every service listens on 127.0.0.1 (the identity provider on localhost) and is never published to other machines. On the deployed demo only Nginx is reachable, on ports 80 and 443, and Cognito replaces the mock identity provider.
 
 ## V1 completion and the next step
 

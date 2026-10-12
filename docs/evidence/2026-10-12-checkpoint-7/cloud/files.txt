@@ -1,0 +1,11 @@
+signed in through Cognito (password + TOTP) as the demo customer: roles CUSTOMER, payment mode RAZORPAY_TEST
+presigned PUT goes to: https://one3d-demo-artifacts-ac0744.s3.ap-south-1.amazonaws.com/uploads/<id> (expires 2026-10-12T09:57:04.029581874Z)
+S3, one byte more than signed: 403 SignatureDoesNotMatch
+S3, Content-Type text/html instead of the signed type: 403 SignatureDoesNotMatch
+S3, signature changed by one character: 403 SignatureDoesNotMatch
+S3, exactly as signed: 200
+finalize: VERIFYING, pinned version yes
+check on the instance (reading the pinned version from S3): VERIFIED, sha256 matches: true
+download: 302 to a link pinned to versionId true; S3 answered 200, application/octet-stream, attachment; filename="cloud check.stl", same bytes: true
+the same object without a signature: 403
+CSP violations on the catalog, custom part, orders and requests pages: 0

@@ -1,0 +1,18 @@
+# What the deployment user (one3d-deployer) can and cannot reach, 2026-10-12 (read-only calls)
+caller: arn:aws:iam::<account>:user/one3d-deployer
+
+## OneCreations (must be refused)
+Amplify app of OneCreations (get-app): AccessDeniedException
+onecreations-media-<account> bucket (list): AccessDenied
+OneCreations budget (describe): AccessDeniedException
+EC2 outside ap-south-1 (us-east-1 describe-instances): UnauthorizedOperation, explicit deny in the identity policy (outside ap-south-1)
+
+## One3D (must be allowed)
+one3d artifacts bucket (list): allowed
+ECR one3d-backend (describe images): allowed
+SSM /one3d/demo parameters (names only): allowed
+
+## Account budgets (shared with OneCreations; read with the one3d budgets permission)
+  Account-Credit-Use	15.0	USD	MONTHLY
+  Account-Out-Of-Pocket	1.0	USD	MONTHLY
+  OneCreations-Monthly-Budget	10.0	USD	MONTHLY
