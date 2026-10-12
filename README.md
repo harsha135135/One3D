@@ -45,7 +45,7 @@ These are planned choices, not claims of hands-on experience. The [scope](docs/v
 
 ## Run it locally
 
-These commands were run between 2026-10-07 and 2026-10-12; results are in the [Checkpoint 1](docs/evidence/2026-10-07-checkpoint-1.md), [2](docs/evidence/2026-10-09-checkpoint-2.md), [3](docs/evidence/2026-10-09-checkpoint-3.md), [4](docs/evidence/2026-10-09-checkpoint-4.md), [5](docs/evidence/2026-10-10-checkpoint-5.md) and [6](docs/evidence/2026-10-12-checkpoint-6.md) evidence.
+These commands were run between 2026-10-07 and 2026-10-12; results are in the [Checkpoint 1](docs/evidence/2026-10-07-checkpoint-1.md), [2](docs/evidence/2026-10-09-checkpoint-2.md), [3](docs/evidence/2026-10-09-checkpoint-3.md), [4](docs/evidence/2026-10-09-checkpoint-4.md), [5](docs/evidence/2026-10-10-checkpoint-5.md), [6](docs/evidence/2026-10-12-checkpoint-6.md) and [7](docs/evidence/2026-10-12-checkpoint-7.md) evidence.
 
 **Prerequisites:** JDK 21 (checked with 21.0.12; point `JAVA_HOME` at it if your default JDK differs), Node 24 LTS for the frontend (`frontend/.nvmrc`) and a running Docker daemon. Maven is not required: use the included `./mvnw` wrapper.
 
