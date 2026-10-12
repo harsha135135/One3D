@@ -1,0 +1,22 @@
+# Diagnosis after the first rollback run (2026-10-12, about 10:38 UTC; instance read through SSM)
+# At this point the instance recorded dc26125 as deployed, after deploys of dc26125, 70ef808 and dc26125 again.
+
+live header (curl -sI https://demo.one3d.store/):
+  script-src 'self' 'unsafe-inline' https://checkout.razorpay.com          <- the 70ef808 policy
+dc26125's bundle on disk (/opt/one3d/app/infra/nginx/https/default.conf.template):
+  script-src includes https://checkout.razorpay.com https://cdn.razorpay.com   <- the new policy
+Nginx's rendered config (/etc/nginx/conf.d/default.conf in the container):
+  script-src 'self' 'unsafe-inline' https://checkout.razorpay.com          <- rendered at container start
+containers:
+  one3d-nginx-1     created 09:43:11, started 10:32:32 (by demo.sh start, from 70ef808's bundle); never recreated
+  one3d-backend-1   created 10:36:43 (recreated by every deploy: its image tag changes)
+  one3d-frontend-1  created 10:36:43
+the container's template mount (/etc/nginx/templates): empty. It is bound to the directory that was
+  /opt/one3d/app when the container started, which each deploy renames and then deletes.
+
+Cause: Nginx renders its templates only when it starts, and Compose recreates a container only when its
+own configuration changes. A deploy that changes only Nginx's templates therefore left the old
+configuration running, while deploy.sh still recorded the new commit as deployed.
+Fix: compose.deploy.yaml labels Nginx with a hash of the templates, which deploy.sh computes, so a
+changed template recreates Nginx. Locally: the same hash leaves the container running, a changed hash
+recreates it with the new template, and a bundle without the label (an older revision) recreates it too.

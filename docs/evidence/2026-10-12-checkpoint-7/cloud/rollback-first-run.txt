@@ -1,0 +1,35 @@
+# Note added afterwards: the "live CSP" lines below are wrong. That version of the check looked for
+# https://cdn.razorpay.com anywhere in the header, and img-src allows it in both revisions. The real
+# script-src stayed the 70ef808 policy throughout, because Nginx was never recreated (nginx-not-recreated.txt).
+# The deploys, the tag files and the HTTP checks below are as recorded.
+
+## 1. The two revisions
+  one3d-backend: dc26125 sha256:77f0ff0ead36…, 70ef808 sha256:77f0ff0ead36…
+  one3d-frontend: dc26125 sha256:30cfb5b3362e…, 70ef808 sha256:30cfb5b3362e…
+  one3d-simulator: dc26125 sha256:e25a973fd6c5…, 70ef808 sha256:e25a973fd6c5…
+  database migrations changed between them: 0
+  files of the deploy bundle changed between them: infra/nginx/https/default.conf.template 
+
+## 2. dc26125, deployed by 'demo.sh start' (the newest passing commit on main)
+  run 38237036520: success (10:33:06–10:34:21 UTC)
+  Deployed dc261254c384f9b38b2664843a8a944e4d5161aa (previous: 70ef808b5fb6fc73113de4e12a8071c07060c1f6)
+  Deploy status: Success
+  instance: deployed dc26125, previous 70ef808
+  live CSP: script-src includes https://cdn.razorpay.com (the dc26125 policy)
+  site: HTTP 200
+
+## 3. Roll back: Deploy a commit with 70ef808
+  run 38237189832: success (10:34:35–10:35:55 UTC)
+  Deployed 70ef808b5fb6fc73113de4e12a8071c07060c1f6 (previous: dc261254c384f9b38b2664843a8a944e4d5161aa)
+  Deploy status: Success
+  instance: deployed 70ef808, previous dc26125
+  live CSP: script-src includes https://cdn.razorpay.com (the dc26125 policy)
+  site: HTTP 200
+
+## 4. Forward again: Deploy a commit with dc26125
+  run 38237353948: success (10:36:08–10:37:19 UTC)
+  Deployed dc261254c384f9b38b2664843a8a944e4d5161aa (previous: 70ef808b5fb6fc73113de4e12a8071c07060c1f6)
+  Deploy status: Success
+  instance: deployed dc26125, previous 70ef808
+  live CSP: script-src includes https://cdn.razorpay.com (the dc26125 policy)
+  site: HTTP 200

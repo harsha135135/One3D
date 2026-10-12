@@ -33,6 +33,10 @@ for required in ONE3D_REGISTRY ONE3D_DOMAIN ONE3D_DB_PASSWORD ONE3D_OIDC_CLIENT_
 done
 
 compose() { docker compose --env-file "$ENV_FILE" -f compose.yaml -f compose.deploy.yaml "$@"; }
+# Nginx is recreated whenever this bundle's templates differ from the running
+# ones (see the label in compose.deploy.yaml); otherwise it keeps running.
+export ONE3D_NGINX_CONFIG
+ONE3D_NGINX_CONFIG=$(cat infra/nginx/bootstrap/* infra/nginx/https/* | sha256sum | cut -c1-16)
 
 # --- images: exactly this commit's, from ECR ---------------------------------
 aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ONE3D_REGISTRY"
