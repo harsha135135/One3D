@@ -225,6 +225,19 @@ class QuotesIT {
     }
 
     @Test
+    void aQuoteTooCloseToExpiryToBePaidCannotBeAccepted() throws Exception {
+        String quoteId = requests.quoted(requests.submitted(alice, "last-minute.stl"), 50_000);
+        // The order's payment window would end with the quote: 5 minutes is too little to pay.
+        jdbc.sql("UPDATE quote SET expires_at = now() + interval '5 minutes' WHERE id = ?::uuid").param(quoteId).update();
+
+        requests.accept(alice, quoteId)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("QUOTE_EXPIRING"));
+
+        assertThat(ordersForQuote(quoteId)).isZero();
+    }
+
+    @Test
     void replacingTheModelWithdrawsTheQuoteAndTheNewRevisionHasNoApproval() throws Exception {
         String requestId = requests.submitted(alice, "v1.stl");
         String firstRevision = requests.latestRevisionId(requestId);
