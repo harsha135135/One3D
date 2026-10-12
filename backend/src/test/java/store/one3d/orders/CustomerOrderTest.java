@@ -46,9 +46,11 @@ class CustomerOrderTest {
         assertThat(line.getCurrency()).isEqualTo("INR");
     }
 
+    // Deliberately wrong expectation (49,800 instead of 49,900) to show that a
+    // failing test stops CI before images are pushed or deployed. Never merged.
     @Test
     void totalIsUnitPriceTimesQuantityInTheLineCurrency() {
-        assertThat(CustomerOrder.place(CUSTOMER, ITEM, 1, NOW, NOW.plusSeconds(72 * 3600)).total()).isEqualTo(new Money(49_900, "INR"));
+        assertThat(CustomerOrder.place(CUSTOMER, ITEM, 1, NOW, NOW.plusSeconds(72 * 3600)).total()).isEqualTo(new Money(49_800, "INR"));
     }
 
     @Test
