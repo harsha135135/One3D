@@ -1,0 +1,47 @@
+# The AWS demo, on top of compose.yaml (never with compose.override.yaml):
+#   docker compose --env-file /opt/one3d/one3d.env -f compose.yaml -f compose.deploy.yaml up -d
+# infra/deploy/deploy.sh does this. Only Nginx is published, on 80 and 443;
+# the database, simulator, backend and frontend stay on the internal network.
+# Images come from ECR by commit SHA (ONE3D_REGISTRY, ONE3D_IMAGE_TAG); nothing
+# is built on the server. Configuration and secrets come from SSM Parameter
+# Store, rendered by deploy.sh into /opt/one3d/one3d.env (root only).
+services:
+  backend:
+    env_file: /opt/one3d/one3d.env
+    environment:
+      SPRING_PROFILES_ACTIVE: aws
+
+  simulator:
+    environment:
+      SIMULATOR_DEV_CONTROLS: "false"
+
+  nginx:
+    image: nginx:1.29-alpine
+    depends_on:
+      - backend
+      - frontend
+    environment:
+      ONE3D_DOMAIN: ${ONE3D_DOMAIN}
+      ONE3D_UPLOAD_ORIGIN: ${ONE3D_UPLOAD_ORIGIN}
+    volumes:
+      # "bootstrap" until the first certificate exists, then "https".
+      - ./infra/nginx/${ONE3D_NGINX_MODE:-https}:/etc/nginx/templates:ro
+      - letsencrypt:/etc/letsencrypt:ro
+      - acme:/var/www/certbot:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    mem_limit: 64m
+    restart: unless-stopped
+
+  # Run on demand by deploy.sh to obtain the Let's Encrypt certificate.
+  certbot:
+    image: certbot/certbot:v5.8.0
+    profiles: ["tools"]
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - acme:/var/www/certbot
+
+volumes:
+  letsencrypt:
+  acme:

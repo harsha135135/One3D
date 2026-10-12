@@ -1,0 +1,100 @@
+# Local development, applied automatically by `docker compose` on top of
+# compose.yaml. Everything is published on the loopback interface only.
+#
+# Usual development (backend and frontend run on the host, see README):
+#   docker compose up -d --build db simulator idp storage storage-init
+# The whole stack in containers, behind a local Nginx on http://localhost:8088
+# (the demo payment shortcut; no keys needed):
+#   docker compose up -d --build
+services:
+  db:
+    ports:
+      # 5433 avoids clashing with a PostgreSQL server installed on the host.
+      - "127.0.0.1:5433:5432"
+
+  simulator:
+    environment:
+      SIMULATOR_DEV_CONTROLS: "true"
+    ports:
+      - "127.0.0.1:8090:8090"
+
+  # Local stand-in for the identity provider (Cognito on AWS): a mock OIDC
+  # server with a login form where you type any username. Usernames starting
+  # with "operator" get the operators group.
+  idp:
+    image: ghcr.io/navikt/mock-oauth2-server:6.0.5
+    environment:
+      SERVER_PORT: "8080"
+      JSON_CONFIG: >-
+        {"interactiveLogin": true, "httpServer": "NettyWrapper",
+         "tokenCallbacks": [{"issuerId": "default", "tokenExpiry": 3600,
+           "requestMappings": [
+             {"requestParam": "subject", "match": "operator.*",
+              "claims": {"sub": "$${subject}", "aud": ["$${clientId}"], "email": "$${subject}@example.test", "groups": ["operators"]}},
+             {"requestParam": "subject", "match": ".*",
+              "claims": {"sub": "$${subject}", "aud": ["$${clientId}"], "email": "$${subject}@example.test", "groups": []}}
+           ]}]}
+    ports:
+      - "127.0.0.1:8180:8080"
+
+  # Local stand-in for private S3 storage. It does not check signatures,
+  # expiry or the signed Content-Length; real S3 does.
+  storage:
+    image: adobe/s3mock:5.2
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: one3d-artifacts
+      COM_ADOBE_TESTING_S3MOCK_STORE_ROOT: /s3mockroot
+      COM_ADOBE_TESTING_S3MOCK_STORE_RETAIN_FILES_ON_EXIT: "true"
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - one3d-storage:/s3mockroot
+
+  # One-shot: turn on bucket versioning, which the application requires.
+  storage-init:
+    image: curlimages/curl:8.17.0
+    depends_on:
+      - storage
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        until curl -sf -o /dev/null http://storage:9090/; do sleep 1; done;
+        curl -sf -X PUT 'http://storage:9090/one3d-artifacts?versioning'
+        -H 'Content-Type: application/xml'
+        -d '<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Status>Enabled</Status></VersioningConfiguration>'
+        && echo 'Bucket versioning enabled'
+
+  # When the whole stack runs in containers: the backend reaches the mock
+  # provider and storage by service name, while the browser uses localhost.
+  # The mock provider names its issuer after the address the token request
+  # used, so the issuer is the internal one.
+  backend:
+    depends_on:
+      idp:
+        condition: service_started
+      storage-init:
+        condition: service_completed_successfully
+    environment:
+      SPRING_PROFILES_ACTIVE: demo
+      ONE3D_PUBLIC_URL: http://localhost:8088
+      ONE3D_OIDC_ISSUER: http://idp:8080/default
+      ONE3D_OIDC_AUTHORIZATION_URI: http://localhost:8180/default/authorize
+      ONE3D_STORAGE_ENDPOINT: http://storage:9090
+      ONE3D_STORAGE_PUBLIC_ENDPOINT: http://localhost:8088/s3
+
+  # The same routing as the deployed Nginx, over plain HTTP on 127.0.0.1:8088,
+  # plus /s3 for the local storage.
+  nginx:
+    image: nginx:1.29-alpine
+    depends_on:
+      - backend
+      - frontend
+    volumes:
+      - ./infra/nginx/local:/etc/nginx/templates:ro
+    mem_limit: 64m
+    ports:
+      - "127.0.0.1:8088:80"
+
+volumes:
+  one3d-storage:

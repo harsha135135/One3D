@@ -1,0 +1,70 @@
+# The deployed demo (compose.deploy.yaml). Variables: ONE3D_DOMAIN and
+# ONE3D_UPLOAD_ORIGIN (the S3 bucket's https origin, for direct uploads).
+# Only this container is published (80 and 443); the backend, frontend,
+# database and simulator are reachable only on the internal network.
+resolver 127.0.0.11 valid=10s ipv6=off;
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${ONE3D_DOMAIN};
+    server_tokens off;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name ${ONE3D_DOMAIN};
+    server_tokens off;
+
+    ssl_certificate     /etc/letsencrypt/live/${ONE3D_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${ONE3D_DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:5m;
+
+    # Requests to the application are small: model files go straight to S3.
+    # The Razorpay webhook is open without sign-in, so this limit matters.
+    client_max_body_size 1m;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    # Razorpay Checkout loads from checkout.razorpay.com and frames
+    # api.razorpay.com; uploads go to the S3 bucket. Next.js needs inline
+    # scripts and styles.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://checkout.razorpay.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; connect-src 'self' ${ONE3D_UPLOAD_ORIGIN} https://api.razorpay.com https://lumberjack.razorpay.com; img-src 'self' data: https://cdn.razorpay.com; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" always;
+
+    set $backend http://backend:8080;
+    set $frontend http://frontend:3000;
+
+    # The API and sign-in go to the backend; it trusts these headers only from
+    # the internal network (server.forward-headers-strategy).
+    location ~ ^/(api|oauth2|login|logout)(/|$) {
+        proxy_pass $backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Port 443;
+        # These come from Nginx above; drop the backend's copies.
+        proxy_hide_header Strict-Transport-Security;
+        proxy_hide_header X-Frame-Options;
+        proxy_hide_header X-Content-Type-Options;
+    }
+
+    location / {
+        proxy_pass $frontend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}

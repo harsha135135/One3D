@@ -1,0 +1,38 @@
+# Local whole-stack routing (compose.override.yaml): plain HTTP on 127.0.0.1:8088.
+# The same split as the deployed site, plus /s3 for the local storage stand-in.
+resolver 127.0.0.11 valid=10s ipv6=off;
+
+server {
+    listen 80;
+    server_name localhost;
+    server_tokens off;
+    client_max_body_size 1m;
+
+    set $backend http://backend:8080;
+    set $frontend http://frontend:3000;
+    set $storage http://storage:9090;
+
+    # The API and sign-in go to the backend.
+    location ~ ^/(api|oauth2|login|logout)(/|$) {
+        proxy_pass $backend;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Presigned uploads and downloads (local only; on AWS the browser talks to S3).
+    location /s3/ {
+        client_max_body_size 25m;
+        rewrite ^/s3/(.*)$ /$1 break;
+        proxy_pass $storage;
+        proxy_set_header Host $http_host;
+        proxy_request_buffering off;
+    }
+
+    location / {
+        proxy_pass $frontend;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
