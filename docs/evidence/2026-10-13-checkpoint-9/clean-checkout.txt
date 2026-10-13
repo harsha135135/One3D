@@ -1,0 +1,56 @@
+
+## 1. A clean checkout of 70c941e39764bf49d60360606e4648328466d7f3 from https://github.com/harsha135135/One3D.git
+commit: 70c941e; untracked or changed files: 0; .env present: no
+
+## 2. docker compose up -d --build (as documented)
+build and start: 24 s (Docker's layer cache from earlier builds on this machine was available)
+backend: Up 11 seconds (healthy) 8080-8081/tcp
+db: Up 16 seconds (healthy) 127.0.0.1:5433->5432/tcp
+frontend: Up 16 seconds (healthy) 3000/tcp
+grafana: Up 16 seconds 127.0.0.1:3001->3000/tcp
+idp: Up 16 seconds 127.0.0.1:8180->8080/tcp
+nginx: Up 10 seconds 127.0.0.1:8088->80/tcp
+prometheus: Up 16 seconds 127.0.0.1:9091->9090/tcp
+simulator: Up 16 seconds (healthy) 127.0.0.1:8090->8090/tcp
+storage: Up 16 seconds 127.0.0.1:9090->9090/tcp
+fresh volumes: one3d-clean_one3d-db one3d-clean_one3d-grafana one3d-clean_one3d-prometheus one3d-clean_one3d-simulator one3d-clean_one3d-storage 
+
+## 3. The site through the local Nginx on http://localhost:8088
+GET /: HTTP 200
+GET /api/catalog/configurations: Hex Desk Organizer (demo) (49900 paise)
+GET /api/orders without a session: HTTP 401
+
+## 4. A customer orders and uses the demo payment shortcut; an operator produces and hands it over
+sign-in as clean-customer: HTTP 302 (to the site after the mock provider's form)
+sign-in as operator-clean: HTTP 302 (to the site after the mock provider's form)
+payment mode: DEMO
+order 8f3863ec: AWAITING_PAYMENT
+demo shortcut: CONFIRMED, DEMO_SIMULATED
+attempt on the simulator: RUNNING
+after the simulator completes: AWAITING_QC
+QC: ACCEPTED, ready: READY_FOR_HANDOFF, handed over: HANDED_OVER
+
+## 5. A model file through the local storage route (/s3 on the same origin)
+upload URL starts with: http://localhost:8088/s3/on…
+PUT: HTTP 200
+file 6a6fcb20: VERIFIED
+
+## 6. Monitoring: Prometheus reads the backend; Grafana answers; the management port is not published
+Prometheus target one3d-backend: up
+Grafana login page on 127.0.0.1:3001: HTTP 200
+management port 8081 from the host: 000 (000 = not published)
+backend log format: 46 JSON lines
+
+## 7. Replace every container; the records stay
+containers recreated: 10
+sign-in as clean-customer: HTTP 302 (to the site after the mock provider's form)
+order 8f3863ec: HANDED_OVER; file 6a6fcb20: VERIFIED
+  PLACED
+  CONFIRMED
+  RELEASED_TO_PRODUCTION
+  QC_PASSED
+  READY_FOR_HANDOFF
+  HANDED_OVER
+
+## 8. Remove this run (its containers and its volumes only)
+removed: 16
