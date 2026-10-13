@@ -1,0 +1,69 @@
+
+## 1. From the internet: only 80 and 443 accept connections (3 s timeout)
+  22 closed/filtered
+  80 open
+  443 open
+  3000 closed/filtered
+  3001 closed/filtered
+  5432 closed/filtered
+  8080 closed/filtered
+  8081 closed/filtered
+  8090 closed/filtered
+  9090 closed/filtered
+  9091 closed/filtered
+
+## 2. Actuator through the public site
+  /actuator/health: HTTP 404, metrics in the body: 0
+  /actuator/prometheus: HTTP 404, metrics in the body: 0
+  /api/actuator/health: HTTP 401, metrics in the body: 0
+  /api/actuator/prometheus: HTTP 401, metrics in the body: 0
+  /actuator/env: HTTP 404, metrics in the body: 0
+
+## 3. On the instance: what listens where
+  0.0.0.0:22
+  0.0.0.0:443
+  0.0.0.0:80
+  127.0.0.1:3001
+  [::]:22
+  [::]:443
+  [::]:80
+
+
+## 4. Containers, memory (t3.small, 2 GiB) and disks
+backend: Up 3 minutes (healthy)
+db: Up 7 minutes (healthy)
+frontend: Up 3 minutes (healthy)
+grafana: Up 7 minutes
+nginx: Up 7 minutes
+prometheus: Up 7 minutes
+simulator: Up 3 minutes (healthy)
+
+                 total        used        free      shared  buff/cache   available
+  Mem:            1909         890         244          17         774         854
+  Swap:           1023          10        1013
+
+one3d-backend-1 388.5MiB / 640MiB
+one3d-db-1 55.72MiB / 256MiB
+one3d-frontend-1 40.11MiB / 192MiB
+one3d-grafana-1 118MiB / 192MiB
+one3d-nginx-1 7.941MiB / 64MiB
+one3d-prometheus-1 50.21MiB / 192MiB
+one3d-simulator-1 47.68MiB / 192MiB
+  Filesystem      Size  Used Avail Use% Mounted on
+  /dev/nvme0n1p1   12G  5.2G  6.8G  44% /
+  /dev/nvme1n1    4.0G  126M  3.9G   4% /opt/one3d/data
+
+
+## 5. Prometheus scrapes the backend on the internal network
+   one3d-backend http://backend:8081/actuator/prometheus up
+   prometheus http://localhost:9090/metrics up
+
+   one3d series: 16
+
+
+## 6. Grafana: only on the instance's loopback, and nothing without signing in
+  /api/search without credentials: HTTP 401
+  /api/dashboards/uid/one3d-overview without credentials: HTTP 401
+  /api/datasources without credentials: HTTP 401
+  provisioned dashboard and config hash label: bbdfd4dfb57a7d62
+

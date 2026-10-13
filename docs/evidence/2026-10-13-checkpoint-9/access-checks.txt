@@ -1,0 +1,11 @@
+signed in through Cognito (password + TOTP) as the demo customer: roles CUSTOMER, payment mode RAZORPAY_TEST
+customer GET /api/ops/orders?status=CONFIRMED: HTTP 403 ACCESS_DENIED
+customer GET /api/ops/printers: HTTP 403 ACCESS_DENIED
+customer GET /api/ops/payments: HTTP 403 ACCESS_DENIED
+customer GET /api/ops/requests?status=SUBMITTED: HTTP 403 ACCESS_DENIED
+customer GET /api/ops/work?status=EXHAUSTED: HTTP 403 ACCESS_DENIED
+customer POST /api/ops/orders/00000000-0000-4000-8000-000000000000/release: HTTP 403 ACCESS_DENIED
+customer POST /api/ops/attempts/00000000-0000-4000-8000-000000000000/qc: HTTP 403 ACCESS_DENIED
+customer GET /api/orders (own orders): HTTP 200
+customer POST /api/orders without the CSRF header: HTTP 403
+no session GET /api/orders: HTTP 401

@@ -15,7 +15,7 @@
   </defs>
   <rect width="1200" height="880" fill="#f8fafc"/>
   <text class="heading" x="44" y="49">One3D V1 · a bounded portfolio application</text>
-  <text class="body" x="44" y="79">Planned, not implemented · 7 October 2026 · one product / one custom STL / one simulated printer</text>
+  <text class="body" x="44" y="79">Implemented (checkpoints 1–8); owner review pending · 13 October 2026 · one product / one custom STL / one simulated printer</text>
   <rect x="30" y="110" width="820" height="594" rx="12" fill="#eef2f6" stroke="#cbd5e1"/>
   <text class="small" x="50" y="136">ONE LOCAL STACK / ONE SMALL EC2 DEMO · DOCKER COMPOSE</text>
 

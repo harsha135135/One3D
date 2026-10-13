@@ -1,0 +1,33 @@
+13:07:26 One3D V1: a small custom-manufacturing order system (Java/Spring Boot, PostgreSQL, Next.js) on AWS. The printer is a simulator and payments are Razorpay TEST MODE: no real printer, no real money.
+13:07:32 This run: a customer sends a model, the operator quotes it, the customer accepts and pays, and the operator produces it through to handoff.
+13:07:39 signed in as the demo customer (Cognito, password and TOTP)
+13:07:39 Customer: one STL (at most 20 MB) with requirements. The browser uploads it straight to a private S3 bucket.
+13:07:45 Request fccd5969 sent. The backend checked the exact stored file version: size, STL structure and SHA-256.
+13:07:51 signed in as the demo operator (Cognito, password and TOTP)
+13:07:52 Operator: reviews revision 1 (and can download that exact checked file), then quotes it.
+13:07:56 The quote is tied to this revision and expires. A new revision would withdraw it.
+13:08:02 signed in as the demo customer (Cognito, password and TOTP)
+13:08:03 Customer: accepting freezes the quote and creates exactly one order (accepting again returns the same order).
+13:08:06 Order a15035b4: pay in Razorpay's hosted Checkout (test card, test bank page).
+13:08:38 Confirmed only by a verified, captured payment (signed webhook or the backend asking Razorpay), never by the browser's word. Payment does not start production.
+13:08:45 signed in as the demo operator (Cognito, password and TOTP)
+13:08:46 Operator: the last print is still on the bed. Nothing clears it automatically; the operator confirms it was removed.
+13:08:50 Bed clear: that clearance belongs to that print and is used by the next start.
+13:08:58 fault set: {"printerId":"0d3d0000-0000-4000-8000-000000000101"}
+13:08:58 Fault injected (through SSM): the simulator will start the next print but lose its acknowledgement.
+13:09:03 Operator queue: release is a separate, explicit operator action.
+13:09:05 Job a6fe019b: start an attempt on the simulated printer.
+13:09:08 START_INTENT: the backend recorded the intent before sending anything; a worker delivers it.
+13:09:09 RECONCILIATION_REQUIRED: no acknowledgement came back. The attempt keeps the printer; a timeout is NOT permission to start again.
+13:09:14 RUNNING: the worker asked the simulator's journal about the SAME command id; it had started, so nothing was sent twice.
+13:09:18 attempt states seen: START_INTENT -> RECONCILIATION_REQUIRED -> RUNNING
+13:09:23 simulator.sh complete: {"printerId":"0d3d0000-0000-4000-8000-000000000101","runningAttemptId":null,"bedState":"OCCUPIED","bedCycleAttemptId":"5f2fff32-0756-4f97-af05-17933273a3c3","simulated":true}
+13:09:24 The simulated printer reported the print complete. Completion is not acceptance: the operator inspects the whole part.
+13:09:28 QC passed. The bed stays occupied until someone removes the part and says so.
+13:09:32 Ready for handoff, then handed over when the customer collects it.
+13:09:37 signed in as the demo customer (Cognito, password and TOTP)
+13:09:38 Customer: the order's progress, built from recorded facts (placed, paid, released, QC passed, ready, handed over).
+13:10:12 Private Grafana (through SSM port forwarding): the lost acknowledgement shows as an 'unknown' start delivery, then reconciled.
+13:10:19 Evidence for tests, CI, deployment, Terraform, monitoring, restore and cost: docs/evidence/ in the repository. Limits: one simulated printer, test-mode payments, one small demo instance.
+13:10:27 order a15035b4-7747-46cd-8cdc-4cc6517568ad, request fccd5969-8021-41ed-b15e-e7d237d99578, job a6fe019b-d187-4d90-89ad-1a9676b907ba
+# Video: 1280x800, 185 s, re-encoded to VP9 (CRF 42) from Playwright's recording to keep it small (2.3 MB).

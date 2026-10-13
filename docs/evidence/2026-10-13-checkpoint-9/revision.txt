@@ -1,0 +1,12 @@
+
+## 1. The revision under test (12:59:14 UTC)
+revision: 70c941e39764bf49d60360606e4648328466d7f3
+deployed on i-026fb29f6b8d6591a: 70c941e39764bf49d60360606e4648328466d7f3
+  one3d-backend:70c941e39764bf49d60360606e4648328466d7f3 sha256:046e39448dda…
+  one3d-frontend:70c941e39764bf49d60360606e4648328466d7f3 sha256:30cfb5b3362e…
+  one3d-simulator:70c941e39764bf49d60360606e4648328466d7f3 sha256:e25a973fd6c5…
+CI on main for this revision: run 38342520979 success
+  Simulator tests: [INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0
+  Frontend checks (lint, build, types, browser smoke tests):   26 passed (23.4s)
+  Backend tests (PostgreSQL, simulator and S3Mock containers): [INFO] Tests run: 55, Failures: 0, Errors: 0, Skipped: 0
+  Backend tests (PostgreSQL, simulator and S3Mock containers): [INFO] Tests run: 187, Failures: 0, Errors: 0, Skipped: 0

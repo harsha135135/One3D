@@ -1,0 +1,24 @@
+# Dependency and security scanning, 2026-10-13T03:41:03Z
+
+## npm audit, frontend (package-lock.json)
+  production dependencies: found 0 vulnerabilities
+  all dependencies, including development tools:
+    @next/eslint-plugin-next high range >=14.3.0-canary.0 fix available: True
+    braces high range * fix available: True
+    eslint-config-next high range >=14.3.0-canary.0 fix available: True
+    fast-glob high range * fix available: True
+    micromatch high range >=0.2.0 fix available: True
+  the advisory behind them: braces vulnerable to stack-exhaustion denial of service through deeply nested patterns https://github.com/advisories/GHSA-vfj7-8cjw-p6xm
+  how it is pulled in:
+    one3d-frontend@0.1.0 /Users/harshamac/developer/One3D/frontend
+    └─┬ eslint-config-next@16.4.0
+      └─┬ @next/eslint-plugin-next@16.4.0
+        └─┬ fast-glob@3.3.1
+          └─┬ micromatch@4.0.8
+            └── braces@3.0.3
+    
+
+## GitHub security features on this private repository
+  dependabot/alerts: Dependabot alerts are disabled for this repository.
+  secret-scanning/alerts: Secret scanning is disabled on this repository.
+  code-scanning/alerts: Code scanning is not enabled for this repository. Please enable code scanning in the repository settings.

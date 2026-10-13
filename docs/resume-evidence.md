@@ -1,6 +1,6 @@
 # V1 evidence and résumé gate
 
-Status: process defined; no implementation evidence yet · Updated: 2026-10-07
+Status: implementation evidence recorded for Checkpoints 1–9 ([IMPLEMENTED.md](../IMPLEMENTED.md)); the owner's review, acceptance and résumé update are pending · Updated: 2026-10-13
 
 V1 should give Harsha concrete engineering work to explain in interviews. A small project can demonstrate code quality, SQL, security, debugging and delivery. The number of installed tools does not establish those skills, and completion does not guarantee a job.
 
@@ -84,6 +84,20 @@ These checkboxes are all pending at the planning stage. V1 is not “done” bec
 Keep **sandbox payment** and **simulated printer** qualifications visible in the project description. Do not describe V1 as operating a production print farm, serving paying customers or providing high availability.
 
 Optional tooling can go in a separate hands-on section after its own exercise: for example, “Ran a local Kubernetes deployment and tested pod restart.” Do not imply Kafka, RabbitMQ, Jenkins, Ansible or Kubernetes powered the application when they were only lab exercises.
+
+## Draft for Harsha's review (2026-10-13)
+
+**These are not claims yet.** Each bullet is worded to match what its evidence actually shows. It becomes usable only after Harsha's explanation, change and debug review of that area (the "Owner review" column of [IMPLEMENTED.md](../IMPLEMENTED.md)) and his acceptance of V1. Checkpoints 3–9 were implemented by an assistant at his request, so the review has to be real, not a reading.
+
+| Draft bullet | Evidence | What it must not be stretched into | Owner review |
+|---|---|---|---|
+| Built a Java 21 / Spring Boot order application on PostgreSQL (Flyway migrations, constraints, row locks), with immutable model revisions, manual quotes and customer/operator access through OIDC (Cognito with TOTP) | [CP1](evidence/2026-10-07-checkpoint-1.md)–[CP5](evidence/2026-10-10-checkpoint-5.md); 242 backend tests, 187 of them integration tests against real PostgreSQL ([CI on `70c941e`](https://github.com/harsha135135/One3D/actions/runs/38342520979)) | A production commerce platform | Pending |
+| Integrated Razorpay test-mode payments with signed webhooks: only captured payments of the right amount confirm an order; repeated events and payments are recorded once, and inconsistent ones are held for review | [CP6](evidence/2026-10-12-checkpoint-6.md) (`RazorpayWebhookIT`, 23 tests today; 9 negative controls); real delivery from Razorpay on AWS ([CP7](evidence/2026-10-12-checkpoint-7.md)) | Live payments or refunds | Pending |
+| Designed dispatch to a separately persisted printer simulator: a database work queue with claim tokens and leases, stable command ids, and reconciliation of lost acknowledgements so that a start is never repeated; tested restarts and concurrent operators | [CP3](evidence/2026-10-09-checkpoint-3.md); the fault found and recovered on AWS ([CP8](evidence/2026-10-12-checkpoint-8.md)) | Control of real printers | Pending |
+| Deployed it on AWS (EC2, private versioned S3, Cognito, ECR, SSM) behind Nginx with HTTPS using Docker Compose. GitHub Actions tests every change and deploys only tested commits (OIDC, no stored keys). Recreated the instance with Terraform without losing data | [CP7](evidence/2026-10-12-checkpoint-7.md), [CP8](evidence/2026-10-12-checkpoint-8.md) | "Reproduced the environment with Terraform": only the instance was recreated, and the full destroy is documented, not run. Not high availability either | Pending |
+| Added Prometheus metrics, a Grafana dashboard and JSON logs with request ids, used them to find an injected simulator outage, and verified backups by restoring into a separate database | [CP8](evidence/2026-10-12-checkpoint-8.md) | Production monitoring or a disaster-recovery guarantee | Pending |
+
+The project description must keep "sandbox payments, simulated printer, one small demo instance" visible.
 
 ## Freeze and continue
 

@@ -1,14 +1,14 @@
-# One3D — planned V1 architecture
+# One3D — V1 architecture
 
-Status: **planned, not implemented** · Decision date: 2026-10-07
+Status: **implemented** (V1 Checkpoints 1–8; see [IMPLEMENTED.md](IMPLEMENTED.md)); owner review and signoff pending · Decided 2026-10-07 · Reconciled with the code 2026-10-13
 
 V1 is a bounded Java backend portfolio project for a fresher. It demonstrates a complete workflow, sound engineering and the ability to explain and operate the result. It is not the first release of the complete print-farm business.
 
-The authoritative feature limits and completion gates are in [V1 scope](docs/v1-scope.md). This document describes its implementation structure. [The target architecture](docs/target-architecture.md) preserves the later business direction without adding V1 requirements. [IMPLEMENTED.md](IMPLEMENTED.md) records evidence; a design described here does not count as implemented.
+The authoritative feature limits and completion gates are in [V1 scope](docs/v1-scope.md). This document describes its implementation structure. [The target architecture](docs/target-architecture.md) preserves the later business direction without adding V1 requirements. [IMPLEMENTED.md](IMPLEMENTED.md) records what was built and the evidence for it; this document alone does not establish that something works.
 
 The previous Lambda/DynamoDB architecture and diagram are [archived](docs/history/architecture-2026-09-30.md). Their services, deployment phases and cost estimates are superseded.
 
-![Planned V1 architecture; no components are implemented yet](architecture.svg)
+![V1 architecture as implemented: the frontend and backend behind Nginx on one EC2 demo, PostgreSQL, the separate simulator, Cognito, private S3 and Razorpay test mode](architecture.svg)
 
 ## 1. The bounded workflow
 
@@ -28,7 +28,7 @@ There is no basket, arbitrary workflow editor, automatic slicer, stock ledger, m
 
 ## 2. Stack and runtime boundaries
 
-| Concern | Planned choice | Responsibility |
+| Concern | Choice | Responsibility |
 |---|---|---|
 | Customer and operator UI | Next.js, React, TypeScript | One frontend with customer pages and `/ops` |
 | Backend | Java 21, Spring Boot, Spring MVC | APIs, permissions and business rules |
@@ -45,42 +45,41 @@ There is no basket, arbitrary workflow editor, automatic slicer, stock ledger, m
 | Infrastructure | Bounded Terraform configuration | Reproducible demo infrastructure and permissions |
 | Monitoring | Actuator/Micrometer, Prometheus, Grafana | Restricted metrics, useful dashboard, failure investigation |
 
-Choose compatible maintained versions during implementation and pin dependencies through build tooling and lockfiles. This plan does not establish that dependencies are installed or verified.
+Versions are pinned through the Maven wrappers and Spring Boot's dependency management, `package-lock.json`, image tags and Terraform's lock file.
 
 The backend is one deployable application. The simulator is separate to model execution that survives a backend restart, not to introduce a real edge platform. S3, Cognito and test payments have narrow client boundaries; the application does not communicate with its own feature packages over a network.
 
 RabbitMQ, Kafka, Kubernetes, Jenkins and Ansible are optional, independently runnable labs. They are not V1 runtime dependencies or release gates. Do not maintain two CI systems for the same exercise or add a broker merely to increase the technology count.
 
-## 3. Planned repository structure
-
-The repository currently contains plans. This is the intended shape, not an inventory of implemented code:
+## 3. Repository structure
 
 ```text
-backend/
-  pom.xml
-  src/main/java/.../one3d/
+backend/                    one Spring Boot application (Maven wrapper)
+  src/main/java/store/one3d/
     identity/ catalog/ requests/ quotes/ orders/
     payments/ production/ files/ background/
-    common/                 small shared errors/configuration only
-  src/main/resources/db/migration/
-  src/test/java/...
-frontend/
+    common/                 shared errors, request ids, deployment guard
+  src/main/resources/db/migration/   Flyway V1–V8
+  src/test/java/...         unit tests and PostgreSQL/Testcontainers integration tests
+frontend/                   Next.js (App Router), TypeScript
   src/app/                  customer routes and /ops
-  src/components/
-  src/lib/                  typed API access
-simulator/
-  pom.xml
-  src/main/java/...
+  src/components/  src/lib/ shared components and typed API access
+  tests/                    Playwright smoke tests (API mocked)
+simulator/                  the separate printer simulator (plain Java, SQLite journal)
 infra/
-  terraform/
-  nginx/
-  monitoring/
-.github/workflows/
-compose.yaml
+  terraform/                bootstrap (state bucket) and demo (the AWS environment)
+  nginx/                    local, bootstrap and https configurations
+  monitoring/               Prometheus configuration, Grafana provisioning and dashboard
+  deploy/  ops/             deploy scripts; start/stop, backups, restore check, instance replacement
+  iam/  account/            the deployment user's policy; account budgets
+  README.md                 the AWS runbook
+.github/workflows/          ci.yml (tests, images, deploy), deploy.yml (redeploy a tested commit)
+compose.yaml  compose.override.yaml  compose.deploy.yaml
 docs/
-  decisions/ runbooks/ evidence/
-labs/                       optional exercises
+  decisions/  evidence/     decision records; one evidence record per checkpoint
 ```
+
+Optional labs have no directory; none was started.
 
 Within a feature, use controller, request/response DTO, application service, domain/entity and repository classes as needed. Do not create every possible layer for every trivial operation. Add subpackages when actual size warrants them.
 
@@ -134,7 +133,7 @@ Use optimistic versions for ordinary edits and short locking/conditional-update 
 
 Use Spring Security OIDC login with Cognito and server-managed sessions. Cookies are HttpOnly and Secure in deployment; cookie-authenticated mutations have CSRF protection. For the single-backend demo, requiring login again after restart is an acceptable documented simplification.
 
-Every endpoint checks role and object ownership. `/ops` is a UI grouping, not access control. Restrict role assignment and use operator MFA for the deployed demo. No Cognito identity pool or browser-held long-lived tokens are required.
+Every endpoint checks role and object ownership. `/ops` is a UI grouping, not access control. Restrict role assignment and use operator MFA for the deployed demo. (Implemented: users are created by an administrator only, and Cognito requires TOTP for every user of the demo pool, because MFA is a pool-wide setting.) No Cognito identity pool or browser-held long-lived tokens are required.
 
 ### Immutable direct uploads
 

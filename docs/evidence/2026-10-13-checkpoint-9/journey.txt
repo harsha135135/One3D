@@ -1,0 +1,15 @@
+signed in through Cognito (password + TOTP) as the demo customer: roles CUSTOMER, payment mode RAZORPAY_TEST
+signed in through Cognito (password + TOTP) as the demo operator: roles CUSTOMER, OPERATOR, payment mode RAZORPAY_TEST
+released order 85639488: job RELEASED
+operator confirmed the previous print was removed: bed CLEAR
+attempt delivered to the simulator by the background worker: RUNNING
+on the instance through SSM, simulator.sh complete: {"printerId":"0d3d0000-0000-4000-8000-000000000101","runningAttemptId":null,"bedState":"OCCUPIED","bedCycleAttemptId":"34469968-7f8e-4636-b92f-69e1bd566b60","simulated":true}
+job after the simulator reported completion: AWAITING_QC
+QC: ACCEPTED; ready for handoff: READY_FOR_HANDOFF; handed over: HANDED_OVER
+the customer's timeline:
+  PLACED
+  CONFIRMED (Paid with Razorpay test mode (payment pay_…))
+  RELEASED_TO_PRODUCTION
+  QC_PASSED
+  READY_FOR_HANDOFF
+  HANDED_OVER

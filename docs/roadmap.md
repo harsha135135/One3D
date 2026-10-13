@@ -1,6 +1,6 @@
 # Roadmap: finish V1, present the evidence, then expand
 
-Status: planned; no checkpoint has passed · Last reviewed: 2026-10-07
+Status: Checkpoint 1 passed (signed off 2026-10-09); Checkpoints 2–8 implemented and tested, Checkpoint 9 prepared; none of 2–9 has passed, because the owner's exercises are pending · Last reviewed: 2026-10-13
 
 ## 1. How to use this roadmap
 
@@ -14,7 +14,7 @@ Advance through working checkpoints rather than a fixed twelve-week promise. A c
 
 Each checkpoint leaves a runnable application, focused changes, relevant tests and an evidence entry. Nothing below is completed merely because it appears in the plan.
 
-**Process change, 2026-10-09 (owner instruction):** the assistant implements Checkpoints 3–9 and merges each checkpoint after its checks pass. Harsha's ownership exercises are deferred until V1 is implemented, so checkpoints are recorded as "implemented and tested; owner review deferred", not as passed. Details are in [IMPLEMENTED.md](../IMPLEMENTED.md#process-change-owner-instruction-2026-10-09).
+**Process change, 2026-10-09 (owner instruction):** the assistant implements Checkpoints 3–9. Harsha merges each checkpoint's pull request himself after its checks pass. Harsha's ownership exercises are deferred until V1 is implemented, so checkpoints are recorded as "implemented and tested; owner review deferred", not as passed. Details are in [IMPLEMENTED.md](../IMPLEMENTED.md#process-change-owner-instruction-2026-10-09).
 
 ## 2. First runnable milestone: one order through one simulator
 
