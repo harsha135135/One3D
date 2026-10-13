@@ -141,7 +141,7 @@ This is a single-instance demo with no replica. Anything written after the newes
 
 ## Replacing the instance
 
-The instance is disposable; the data volume, the Elastic IP, the buckets, ECR and Cognito are not. To get a fresh instance (a broken root disk, a new Amazon Linux image), use the phases of [`replace-instance.sh`](../docs/evidence/2026-10-12-checkpoint-8/cloud/replace-instance.sh). It was used in Checkpoint 8, with `PLAN_FILE` set outside the repository because a saved plan holds sensitive values:
+The instance is disposable; the data volume, the Elastic IP, the buckets, ECR and Cognito are not. To get a fresh instance (a broken root disk, a new Amazon Linux image), use the phases of [`infra/ops/replace-instance.sh`](ops/replace-instance.sh), with `PLAN_FILE` set outside the repository because a saved plan holds sensitive values. Checkpoint 8 used it ([the copy that ran](../docs/evidence/2026-10-12-checkpoint-8/cloud/replace-instance.sh)). In this copy, turning termination protection off and on also goes through a saved plan that may change nothing else:
 
 1. **`prepare`:**
    - `demo.sh stop` (a backup) and a snapshot of the data volume;
@@ -178,10 +178,18 @@ Then check the site and a few records, run `terraform plan` (it should show no c
    terraform -chdir=infra/terraform/bootstrap destroy
    ```
 8. Delete the `one3d-deployer` user and its policy (as root, or as another administrator).
-9. Check that nothing remains:
+9. Check that nothing remains. The deployment user can run each of these (all should be empty):
    ```bash
-   aws resourcegroupstaggingapi get-resources --tag-filters Key=Project,Values=one3d
+   aws ec2 describe-instances --filters Name=tag:Name,Values=one3d-demo Name=instance-state-name,Values=pending,running,stopping,stopped
+   aws ec2 describe-volumes --filters Name=tag:Name,Values=one3d-demo-data
+   aws ec2 describe-addresses --filters Name=tag:Name,Values=one3d-demo
+   aws ec2 describe-snapshots --owner-ids self
+   aws s3 ls | grep one3d
+   aws ecr describe-repositories --query 'repositories[?starts_with(repositoryName, `one3d`)]'
+   aws cognito-idp list-user-pools --max-results 20 --query 'UserPools[?starts_with(Name, `one3d`)]'
+   aws ssm get-parameters-by-path --path /one3d/ --recursive --query 'Parameters[].Name'
    ```
+   A single tag query (`aws resourcegroupstaggingapi get-resources --tag-filters Key=Project,Values=one3d`) needs `tag:GetResources`. The policy in `infra/iam/` now grants it (an earlier version named it wrongly). Applying that version is optional, done once as root with `aws iam create-policy-version --policy-arn <arn> --policy-document file://infra/iam/one3d-deployer-policy.json --set-as-default`.
    Check the next day's bill as well.
 
 The account-wide budgets stay in place for OneCreations unless you remove them.
