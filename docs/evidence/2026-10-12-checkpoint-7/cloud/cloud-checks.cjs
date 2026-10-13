@@ -336,7 +336,7 @@ async function journeyPart(browser) {
 }
 
 // Checkpoint 8's scripts reuse the sign-in and SSM helpers.
-module.exports = { SITE, PRINTER, signIn, visit, api, json, onInstance, sql, log };
+module.exports = { SITE, PRINTER, demoUser, freshTotp, signIn, visit, api, json, onInstance, sql, log };
 
 if (require.main === module) (async () => {
   fs.mkdirSync(OUT, { recursive: true });
