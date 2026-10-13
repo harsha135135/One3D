@@ -2,9 +2,14 @@
 
 **V1: a focused Java backend portfolio project, built to demonstrate fresher-level engineering skills.**
 
-One3D is the planned custom-manufacturing business of [OneCreations](https://github.com/harsha135135/OneCreations). Its operating software is called **PrintFlow**. Checkpoint 1 of V1 (a catalog order API on Spring Boot and PostgreSQL) is implemented, tested locally and signed off by the owner. Checkpoint 2 (release, jobs, attempts, bed clearance and QC) Checkpoint 3 (a separate durable printer simulator, dispatch and reconciliation, protection against concurrent operators) and Checkpoint 4 (sign-in, roles, order ownership and the customer and operator frontend) are implemented and tested; their owner reviews are deferred until V1 is complete. Later checkpoints, infrastructure and deployment are not implemented yet, and V1 is not complete.
+One3D is the planned custom-manufacturing business of [OneCreations](https://github.com/harsha135135/OneCreations). Its operating software is called **PrintFlow**. V1 is implemented:
+- **The application:** a Spring Boot and PostgreSQL backend with a Next.js customer and operator frontend, a separate durable printer simulator, private S3 uploads, Razorpay in test mode, and Cognito sign-in.
+- **Operations:** Docker Compose, an on-demand AWS demo behind Nginx with HTTPS, a GitHub Actions pipeline, Terraform, Prometheus and Grafana, and tested backup and restore.
+- **Evidence:** each checkpoint has an evidence record ([implementation status](IMPLEMENTED.md)).
 
-Status: Checkpoint 1 complete (signed off 2026-10-09; schema explanation reference-assisted, to revisit); Checkpoints 2–4 implemented and tested, owner reviews deferred until V1 is complete · Scope updated: 2026-10-07
+V1 is **not yet accepted**. Checkpoint 1 was signed off by the owner. At the owner's request, an assistant implemented Checkpoints 3–9 (and Checkpoint 2's attempt limit). The owner's reviews of Checkpoints 2–9 were deferred until V1 was implemented, and are the next step.
+
+Status: **implementation ready; personal review and signoff pending** · Updated: 2026-10-13
 
 ## What we are building first
 
@@ -27,7 +32,7 @@ The hiring evidence comes from explaining and testing the workflow: authorizatio
 
 The latest explicit owner instruction takes precedence. Otherwise, `docs/v1-scope.md` sets the current implementation boundary. Future plans and historical documents do not add V1 requirements.
 
-## Intended stack
+## Stack
 
 | Area | V1 choice |
 |---|---|
@@ -41,7 +46,7 @@ The latest explicit owner instruction takes precedence. Otherwise, `docs/v1-scop
 | Delivery | GitHub Actions as the single primary CI pipeline; Terraform for that same environment |
 | Monitoring | Prometheus and Grafana: a few useful metrics, one dashboard and a demonstrated failure diagnosis |
 
-These are planned choices, not claims of hands-on experience. The [scope](docs/v1-scope.md) defines the minimum evidence for each required tool. **Ansible, Jenkins, RabbitMQ, Kafka and local Kubernetes are optional labs.** They must not become prerequisites for finishing V1. There is no required microservice split, message broker, Kubernetes cluster or multi-region deployment.
+Each was used in V1; what was shown, and its limits, is in the [implementation status](IMPLEMENTED.md) and the evidence records. They become résumé claims only after the owner's review ([résumé gate](docs/resume-evidence.md)). The [scope](docs/v1-scope.md) defines the minimum evidence for each required tool. **Ansible, Jenkins, RabbitMQ, Kafka and local Kubernetes are optional labs.** They must not become prerequisites for finishing V1. There is no required microservice split, message broker, Kubernetes cluster or multi-region deployment.
 
 ## Run it locally
 
@@ -176,10 +181,10 @@ Add run, test and demo commands for later checkpoints only after they have been 
 | Address | Purpose |
 |---|---|
 | `onecreations.in` | Creative studio and public portfolio, maintained in its separate repository |
-| `one3d.store` | Intended One3D customer application and V1 demonstration |
-| `one3d.store/ops` | Operator screens in the same application, protected by backend authorization |
+| `demo.one3d.store` | The V1 demonstration on AWS, started on demand and usually stopped (see [the demo script](docs/demo.md)). Its operator screens are under `/ops`, protected by backend authorization |
+| `one3d.store` | Intended future One3D customer application; not deployed |
 
-These are intended destinations, not a claim that One3D is deployed. One3D uses the Vantablack direction recorded in [brand and websites](docs/brand-and-websites.md). OneCreations uses Matte Black. The visual direction does not expand V1 into a full commercial storefront.
+`one3d.store` itself is an intended destination, not a deployment. One3D uses the Vantablack direction recorded in [brand and websites](docs/brand-and-websites.md). OneCreations uses Matte Black. The visual direction does not expand V1 into a full commercial storefront.
 
 ## Future business context
 

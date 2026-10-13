@@ -1,6 +1,6 @@
 # One3D V1: a backend project for a fresher portfolio
 
-Status: agreed direction; implementation not started · Last reviewed: 2026-10-07
+Status: agreed scope; implemented through Checkpoint 9's release preparation, completion gate open (owner review and signoff pending) · Last reviewed: 2026-10-13
 
 ## 1. Purpose and scope authority
 
