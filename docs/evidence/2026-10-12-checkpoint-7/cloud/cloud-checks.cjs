@@ -335,7 +335,10 @@ async function journeyPart(browser) {
   await operator.context.close();
 }
 
-(async () => {
+// Checkpoint 8's scripts reuse the sign-in and SSM helpers.
+module.exports = { SITE, PRINTER, signIn, visit, api, json, onInstance, sql, log };
+
+if (require.main === module) (async () => {
   fs.mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch();
   const parts = { files: filesPart, order: orderPart, csp: cspPart, journey: journeyPart };

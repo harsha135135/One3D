@@ -1,0 +1,13 @@
+signed in through Cognito (password + TOTP) as the demo customer: roles CUSTOMER, payment mode RAZORPAY_TEST
+placed order 3627d7c0: AWAITING_PAYMENT, 499 INR
+Checkout opened from the order page; entered Razorpay's documented test card (Visa 4100 2800 0000 1007) and a dummy contact number
+Razorpay's test bank page: https://api.razorpay.com/v1/gateway/mocksharp/payment; chose Success (test mode only; no real bank or money)
+back on the order page: Payment received. Your order is confirmed.
+CSP violations on the order page during Checkout: 0
+order: CONFIRMED, confirmed by RAZORPAY_TEST
+payment recorded: pay_… | WEBHOOK | APPLIED | 49900 INR
+webhook deliveries from Razorpay for this payment (signature checked; event, outcome, timing):
+  payment.authorized | IGNORED | -1 s after the payment was recorded
+  payment.captured | APPLIED | 0 s after the payment was recorded
+  order.paid | ALREADY_RECORDED | 0 s after the payment was recorded
+seconds from choosing Success to this check: 27

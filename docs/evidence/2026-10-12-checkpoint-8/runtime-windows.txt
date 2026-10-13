@@ -5,3 +5,5 @@
 2026-10-12 10:01 - 10:09   CSP check, test payments, full journey
 2026-10-12 10:31 - 10:40   deploy dc26125, first rollback run, webhook payment
 2026-10-12 10:56 - 11:04   deploy 15ff7c2, rollback run, payment under the new CSP
+2026-10-12 15:11 - 15:25   Checkpoint 8 part 2: deploy 41f85c5, monitoring checks, payment, fault exercise, restore check
+2026-10-12 15:27 - 15:40   replacement instance i-026fb29f6b8d6591a: first boot, deploy, rechecks (old instance terminated 15:27)

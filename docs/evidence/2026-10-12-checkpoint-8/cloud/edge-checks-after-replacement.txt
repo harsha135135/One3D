@@ -1,0 +1,47 @@
+
+## 1. DNS and TLS
+A demo.one3d.store -> 13.234.148.122 (1.1.1.1); AAAA: 0 records
+issuer=C=US, O=Let's Encrypt, CN=YE1
+subject=CN=demo.one3d.store
+notAfter=Jan 10 08:35:28 2027 GMT
+TLS 1.1 refused: yes
+
+## 2. HTTP redirects to HTTPS; security headers
+http://demo.one3d.store/orders -> 301 https://demo.one3d.store/orders
+HTTP/2 200 
+strict-transport-security: max-age=31536000
+x-content-type-options: nosniff
+x-frame-options: DENY
+referrer-policy: strict-origin-when-cross-origin
+content-security-policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://cdn.razorpay.com; frame
+
+## 3. Only 80 and 443 are reachable (TCP connect from outside, 3 s timeout)
+  22 closed/filtered
+  80 open
+  443 open
+  3000 closed/filtered
+  5432 closed/filtered
+  8080 closed/filtered
+  8090 closed/filtered
+  9090 closed/filtered
+
+## 4. Anonymous API access
+GET /api/catalog/configurations: 200
+GET /api/orders: UNAUTHENTICATED HTTP 401
+GET /api/ops/orders: UNAUTHENTICATED HTTP 401
+POST webhook without a signature: INVALID_SIGNATURE HTTP 400
+POST /api/orders without session or CSRF: HTTP 403
+2 MB body to the webhook: HTTP 413
+
+## 5. Sign-in goes to Cognito over HTTPS with Secure cookies
+HTTP/2 302 
+location: https://one3d-demo-ac0744.auth.ap-south-1.amazoncognito.com/oauth2/authorize?response_type=code&client_id=6fpbbq18bmkn7qgm0g6ok229j9&scope=openid%20email%20profile&state=…&redirect_uri=https
+set-cookie: XSRF-TOKEN=…; Path=/; Secure
+set-cookie: JSESSIONID=…; Path=/; Secure; HttpOnly; SameSite=Lax
+
+## 6. The file bucket is private
+anonymous list: HTTP 403
+anonymous object GET: HTTP 403
+plain HTTP to the bucket: HTTP 403
+CORS preflight from https://demo.one3d.store: HTTP/1.1 200 OK Access-Control-Allow-Origin: https://demo.one3d.store 
+CORS preflight from https://attacker.example: HTTP/1.1 403 Forbidden 

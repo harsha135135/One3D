@@ -1,0 +1,2 @@
+signed in through Cognito (password + TOTP) as the demo customer: roles CUSTOMER, payment mode RAZORPAY_TEST
+order 3627d7c0: HTTP 200 HANDED_OVER; file 3f45dde5: HTTP 200 VERIFIED

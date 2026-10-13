@@ -1,11 +1,16 @@
 package store.one3d.payments;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -27,7 +32,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -92,6 +99,30 @@ class RazorpayWebhookIT {
         api.get("/api/orders/" + orderId + "/timeline")
                 .andExpect(jsonPath("$[1].kind").value("CONFIRMED"))
                 .andExpect(jsonPath("$[1].detail").value(org.hamcrest.Matchers.startsWith("Paid with Razorpay test mode")));
+    }
+
+    /** On the demo Nginx sends its own id; the backend's log lines for the request carry it (Checkpoint 8). */
+    @Test
+    void theWebhookLogLinesCarryTheRequestIdFromNginx() throws Exception {
+        String requestId = "3f2a9c41d7e04b6f8a1c2d3e4f5a6b7c";
+        ListAppender<ILoggingEvent> lines = new ListAppender<>();
+        lines.start();
+        Logger webhookLog = (Logger) LoggerFactory.getLogger(RazorpayWebhooks.class);
+        webhookLog.addAppender(lines);
+        try {
+            String body = RazorpayEvents.captured(RazorpayEvents.newPaymentId(), providerOrderId, amount);
+            mvc.perform(post("/api/payments/razorpay/webhook").with(anonymous())
+                            .contentType(MediaType.APPLICATION_JSON).content(body)
+                            .header("X-Razorpay-Event-Id", RazorpayEvents.newEventId())
+                            .header("X-Razorpay-Signature", RazorpayEvents.sign(body))
+                            .header("X-Request-Id", requestId))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("X-Request-Id", requestId));
+        } finally {
+            webhookLog.detachAppender(lines);
+        }
+        assertThat(lines.list).isNotEmpty().allSatisfy(line ->
+                assertThat(line.getMDCPropertyMap()).containsEntry("request_id", requestId));
     }
 
     @Test

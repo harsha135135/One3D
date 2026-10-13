@@ -1,0 +1,27 @@
+
+## Before: the instance, its data volume and the address (15:25:10 UTC)
+instance: i-08b860e0cf0061856	running	2026-10-12T15:11:11+00:00	ami-08e3b3155fc937a94	13.234.148.122
+vol-04658c389a8c8dd08	4	in-use	i-08b860e0cf0061856
+
+## 1. Back up and stop (demo.sh stop) (15:25:11 UTC)
+backup: s3://one3d-demo-ops-ac0744/backups/one3d-20261012T152514Z.dump
+Stopped. Data stays on the data volume and in S3.
+
+## 2. Snapshot the data volume (a second copy while the instance is replaced) (15:25:43 UTC)
+snapshot snap-0d8dc0897d6150c53: completed
+
+## 3. Termination protection off (an in-place change) (15:26:45 UTC)
+  # aws_instance.demo will be updated in-place
+Apply complete! Resources: 0 added, 1 changed, 0 destroyed.
+
+## 4. The plan to replace the instance, saved (15:26:56 UTC)
+  # aws_eip.demo will be updated in-place
+  # aws_iam_role_policy.github_deploy will be updated in-place
+  # aws_instance.demo will be replaced, as requested
+  # aws_volume_attachment.data must be replaced
+Plan: 2 to add, 2 to change, 2 to destroy.
+
+## 5. Guard: the saved plan deletes only the instance and its volume attachment (15:27:03 UTC)
+  deleted (and created again): aws_instance.demo
+  deleted (and created again): aws_volume_attachment.data
+  data volume, buckets, images, Cognito, parameters and the Elastic IP: not deleted
