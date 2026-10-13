@@ -49,7 +49,10 @@ The acceptance run itself: [`acceptance.sh`](2026-10-13-checkpoint-9/acceptance.
 
 ## 3. Failures and findings during the run
 
-- **The deployment profile resolved to the root user.** After the first `aws login`, the profile `one3d-deployer` signed in as the account's root. `aws login` had reused a signed-in root browser session, as in Checkpoint 7. It was caught by a check before anything ran on AWS. Work waited until the owner signed in again as `user/one3d-deployer`. The runbook already warns about this.
+- **The deployment profile resolved to the root user.** After the first `aws login`, the profile `one3d-deployer` signed in as the account's root. `aws login` had reused a signed-in root browser session, as in Checkpoint 7.
+  - **What ran as root:** the identity check ran in the same command as two read-only calls, `terraform output` (which reads the state from S3) and `aws ec2 describe-instances` ("stopped"). Both changed nothing.
+  - **After it was found:** all AWS work stopped until the owner signed in again and `sts get-caller-identity` showed `user/one3d-deployer`.
+  - **Lesson:** check the identity on its own, before any other call. The runbook already warns about the browser session.
 - **First recording take: the final click timed out.** Two causes:
   - **A UI defect (`frontend/src/app/ops/page.tsx`).** After an operator action, the queue reloads the list for the filter that was selected *when the action started*. If the filter changes while that request is in flight, the old filter's results can replace the new view. It was confirmed by reading the code and by the same view loading correctly when nothing was in flight. Nothing is lost or changed; it only displays the wrong list until the next reload. **Not fixed here,** because a code change would replace the tested revision; it is listed for the owner. The recording now waits for the action to finish.
   - **The uncertain state was not on screen.** The attempt's RECONCILIATION_REQUIRED state lasts about two seconds (one retry backoff), and the first take's caption pause covered it. The database showed the start took **2 delivery tries**, so the fault was real. The second take polls faster and shows all three states.

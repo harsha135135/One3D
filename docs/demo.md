@@ -13,10 +13,12 @@ How to show One3D V1 in about five minutes, live on `https://demo.one3d.store` o
    Add each `totp_uri` to an authenticator app once. Use two browser profiles, or a private window, so both users can be signed in at the same time.
 3. **The dashboard (optional):** forward Grafana through SSM (`infra/README.md`, "Metrics and logs") and sign in.
 4. **Have the fixture ready:** [`demo/fixtures/wall-hook.stl`](demo/fixtures/wall-hook.stl), a synthetic two-box model (1.3 KB, 24 triangles).
-5. **The lost-acknowledgement fault:** turn it on just before the operator starts the print. It runs on the instance through SSM, because the simulator's controls are not public:
+5. **The lost-acknowledgement fault:** turn it on just before the operator starts the print. It runs on the instance through SSM, because the simulator's controls are not public. This is the form the recording used; its inner command was also checked against the local stack:
    ```bash
-   aws ssm send-command --instance-ids <instance_id> --document-name AWS-RunShellScript --parameters \
-     'commands=["docker run --rm --network one3d_default curlimages/curl:8.17.0 -s -X POST -H \"Content-Type: application/json\" -d \"{\\\"dropNextStartAck\\\": true}\" http://simulator:8090/dev/printers/0d3d0000-0000-4000-8000-000000000101/faults"]'
+   INSTANCE=$(terraform -chdir=infra/terraform/demo output -raw instance_id)
+   CMD='docker run --rm --network one3d_default curlimages/curl:8.17.0 -s -X POST -H "Content-Type: application/json" -d "{\"dropNextStartAck\": true}" http://simulator:8090/dev/printers/0d3d0000-0000-4000-8000-000000000101/faults'
+   aws ssm send-command --instance-ids "$INSTANCE" --document-name AWS-RunShellScript \
+     --parameters "$(jq -n --arg c "$CMD" '{commands: [$c]}')"
    ```
 
 ## The script
@@ -28,7 +30,7 @@ How to show One3D V1 in about five minutes, live on `https://demo.one3d.store` o
 | 1:30–2:15 | **Customer:** Pay with Razorpay (test mode), with the test card and "Success" on the test bank page. **Operator:** queue → Release | Only a verified, captured payment confirms the order: a signed webhook, or the backend asking Razorpay. The browser's report never counts. Duplicate events are recorded once. Payment does not start production; release is a separate operator action. | [CP6](evidence/2026-10-12-checkpoint-6.md), [CP7 addendum: webhook delivery](evidence/2026-10-12-checkpoint-7.md) |
 | 2:15–3:15 | **Operator:** Printers → mark bed clear. Turn on the fault. Job → Start attempt; reload | The start is recorded first (START_INTENT), then a worker sends it. The reply is lost, so the attempt is RECONCILIATION_REQUIRED and keeps the printer: a timeout is not permission to start again. The worker asks the simulator's journal about the same command id. It had started, so it becomes RUNNING and nothing runs twice. | [CP3](evidence/2026-10-09-checkpoint-3.md), [CP8 fault on AWS](evidence/2026-10-12-checkpoint-8.md#8-fault-exercise-on-aws-found-through-metrics-and-logs) |
 | 3:15–4:00 | Finish the print (`simulator.sh complete` through SSM). Job → QC Passed. Queue → Ready for handoff → Handed over. **Customer:** the order's progress | Completion is not acceptance: whole-part QC decides. The bed stays occupied until someone confirms the part was removed, and that clearance belongs to that print. The customer's timeline is built from recorded facts. | [CP2](evidence/2026-10-09-checkpoint-2.md), [CP3](evidence/2026-10-09-checkpoint-3.md), [CP6](evidence/2026-10-12-checkpoint-6.md) |
-| 4:00–5:00 | Grafana (the 'unknown' delivery and its recovery); the GitHub Actions runs; the evidence folder | 242 backend tests against real PostgreSQL. CI blocks promotion when a test fails. Images are pushed by commit and deployed through SSM, and a rollback is checked from outside. The instance was recreated with Terraform without losing data. A restore was verified. **Limits:** one simulated printer, test payments, one small instance, MFA for every user. | [CP7](evidence/2026-10-12-checkpoint-7.md), [CP8](evidence/2026-10-12-checkpoint-8.md), [CP9](evidence/2026-10-13-checkpoint-9.md) |
+| 4:00–5:00 | Grafana (the 'unknown' delivery and its recovery); the GitHub Actions runs; the evidence folder | 242 backend tests, 187 of them integration tests against real PostgreSQL. CI blocks promotion when a test fails. Images are pushed by commit and deployed through SSM, and a rollback is checked from outside. The instance was recreated with Terraform without losing data. A restore was verified. **Limits:** one simulated printer, test payments, one small instance, MFA for every user. | [CP7](evidence/2026-10-12-checkpoint-7.md), [CP8](evidence/2026-10-12-checkpoint-8.md), [CP9](evidence/2026-10-13-checkpoint-9.md) |
 
 ## If the live demo is not available
 
