@@ -1,0 +1,10 @@
+# 2026-10-13T12:51:47Z
+instance i-026fb29f6b8d6591a: stopped t3.small, termination protection True
+data volume: vol-04658c389a8c8dd08 4 in-use i-026fb29f6b8d6591a True
+Elastic IP: 13.234.148.122 i-026fb29f6b8d6591a
+unattached volumes: 0; snapshots: 0
+bucket one3d-demo-artifacts-…: versioning Enabled, objects 1
+bucket one3d-demo-ops-…: versioning Enabled, objects 14
+ECR images (backend tags): 3
+Cognito users: 2
+site: HTTP 000

@@ -1,0 +1,37 @@
+
+## 1. A fresh backup of the live database (20261013T130206Z)
+pg_dump (custom format): 71373 bytes
+stored in the ops bucket as backups/one3d-20261013T130206Z-restore-check.dump, and the copy restored below was read back from S3
+
+## 2. Restore into a separate database (one3d_restore_check) on the same server
+migrations in the copy: 1,2,3,4,5,6,7,8
+
+## 3. Row counts, live and restored (the demo was idle, so they should match)
+  customer_order       live 7    restored 7    identical
+  order_line           live 7    restored 7    identical
+  order_fact           live 25   restored 25   identical
+  checkout             live 6    restored 6    identical
+  payment              live 6    restored 6    identical
+  payment_event        live 12   restored 12   identical
+  production_job       live 3    restored 3    identical
+  print_attempt        live 3    restored 3    identical
+  printer_command      live 3    restored 3    identical
+  bed_clearance        live 2    restored 2    identical
+  artifact             live 1    restored 1    identical
+  custom_request       live 0    restored 0    identical
+  submission_revision  live 0    restored 0    identical
+  quote                live 0    restored 0    identical
+  pending_work         live 4    restored 4    identical
+
+## 4. One order and what it links to, read from both databases
+order 85639488, restored: HANDED_OVER | RAZORPAY_TEST | Hex Desk Organizer (demo) | recipe revision 1 | WEBHOOK APPLIED 49900 INR | job ACCEPTED | attempt 1 COMPLETED QC PASSED | command ACKNOWLEDGED | 6 timeline facts
+live and restored: identical
+
+## 5. One checked file: the restored record still names its exact stored version
+file 3f45dde5: version 00OUYqa8…, record in live and restored: identical
+that version read from storage: 10084 bytes; SHA-256 matches the restored record: yes
+
+## 6. Remove the copy
+dropped one3d_restore_check; the live database and the application were not changed
+	NOTICE:  database "one3d_restore_check" does not exist, skipping
+

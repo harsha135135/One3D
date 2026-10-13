@@ -1,0 +1,4 @@
+# AWS Budgets, read 2026-10-13T13:12:08Z by the deployment user (Budgets updates a few times a day and lags billing)
+  Account-Credit-Use       limit 15.0 USD, actual 0.739 USD this month (from 2026-10-01; updated 2026-10-13T18:20:42.918000+05:30)
+  Account-Out-Of-Pocket    limit 1.0 USD, actual 0.0 USD this month (from 2026-10-01; updated 2026-10-13T18:18:11.330000+05:30)
+# Account-Credit-Use: usage before credits, whole account (One3D and OneCreations). Account-Out-Of-Pocket: what remains after credits.
