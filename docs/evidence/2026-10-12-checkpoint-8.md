@@ -30,7 +30,7 @@ Part 1 (§1–§5) is the implementation, checked locally. Part 2 (§6–§11) i
 
 | Suite | Command | Result |
 |---|---|---|
-| backend | `./mvnw clean verify` (in `backend/`) | **241 passed**: 55 unit, 186 integration, 29 s ([summary](2026-10-12-checkpoint-8/backend-test-reports/failsafe-summary.xml)) |
+| backend | `./mvnw clean verify` (in `backend/`) | Part 1: **241 passed** (55 unit, 186 integration, 29 s; [summary](2026-10-12-checkpoint-8/backend-test-reports/failsafe-summary.xml)). With part 2's added test: **242 passed** in CI ([run 38272324659](https://github.com/harsha135135/One3D/actions/runs/38272324659) on `811df11`: 55 unit, 187 integration) |
 | simulator, frontend | unchanged | Run by CI on the pull request |
 
 New and changed tests:
@@ -208,11 +208,16 @@ The procedure for restoring the live database (stop the application, restore, co
   - usage before credits this month is **US$0.53** for the whole account, One3D and OneCreations together;
   - **US$0.00** out of pocket.
   - Budgets updates a few times a day and billing lags, so the final figure for the demo period is recorded in Checkpoint 9.
-- **Comparison with the estimate:** decision 0003 estimated about $0.18 a day stopped plus $0.0224 an hour running. One day of standing cost plus 2.3 hours is about $0.23, which is in line with the account's $0.53 so far, since that also includes OneCreations. **No saving is claimed.**
+- **Comparison with the estimate:** decision 0003 estimates about $0.18 a day stopped plus $0.0224 an hour running, which is about $0.23 for this first day. The Budgets figure cannot be compared with that yet: Budgets lags by up to a day, so it probably does not include all of the 12th's usage, and it covers OneCreations too. The comparison is made in Checkpoint 9 from a later reading. **No saving is claimed.**
+- **Cleanup result:** each exercise cleaned up after itself:
+  - the restore copies were dropped;
+  - the replaced instance and its root disk were terminated;
+  - the data-volume snapshot was deleted after the checks.
+  A read-only inventory afterwards ([`cloud/inventory-after-checkpoint-8.txt`](2026-10-12-checkpoint-8/cloud/inventory-after-checkpoint-8.txt)) found no unattached volumes and no snapshots, one Elastic IP on the new instance, and the state bucket versioned, encrypted (AES256) and blocked from public access. Its tag query was refused: the deployment user's policy named the wrong action, fixed in Checkpoint 9. Destroying the whole demo is documented (`infra/README.md`) and has not been run; it is the owner's decision.
 
 ## Owed
 
-Nothing for Checkpoint 8. The final billed cost and the demo's clean-up belong to Checkpoint 9.
+Nothing for Checkpoint 8. The later cost reading belongs to Checkpoint 9; destroying the demo is the owner's decision.
 
 ## Known limitations
 
