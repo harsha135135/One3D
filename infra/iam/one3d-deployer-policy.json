@@ -53,7 +53,7 @@
         "ssm:StartSession",
         "ssm:TerminateSession",
         "ssm:ResumeSession",
-        "resourcegroupstaggingapi:GetResources",
+        "tag:GetResources",
         "pricing:GetProducts",
         "freetier:Get*",
         "s3:ListAllMyBuckets",
