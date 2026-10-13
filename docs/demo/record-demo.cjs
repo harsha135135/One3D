@@ -180,22 +180,24 @@ async function attemptStatus(page, jobId) {
   await page.waitForLoadState("networkidle");
   await caption(page, `Job ${short(jobId)}: start an attempt on the simulated printer.`, 2500);
   await page.getByRole("button", { name: "Start attempt" }).click();
+  // The uncertain state lasts only about two seconds (one retry backoff), so poll quickly and reload the
+  // page the moment the state changes; the caption is held while that page stays on screen.
+  const explain = {
+    START_INTENT: "START_INTENT: the backend recorded the intent before sending anything; a worker delivers it.",
+    RECONCILIATION_REQUIRED: "RECONCILIATION_REQUIRED: no acknowledgement came back. The attempt keeps the printer; a timeout is NOT permission to start again.",
+    RUNNING: "RUNNING: the worker asked the simulator's journal about the SAME command id; it had started, so nothing was sent twice.",
+  };
   const seen = [];
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 240 && seen.at(-1) !== "RUNNING"; i++) {
     const status = await attemptStatus(page, jobId);
     if (status && seen.at(-1) !== status) {
       seen.push(status);
       await page.reload();
-      await page.waitForLoadState("networkidle");
-      const explain = {
-        START_INTENT: "START_INTENT: the backend recorded the intent before sending anything; a worker delivers it.",
-        RECONCILIATION_REQUIRED: "RECONCILIATION_REQUIRED: no acknowledgement came back. The attempt keeps the printer; a timeout is NOT permission to start again.",
-        RUNNING: "RUNNING: the worker asked the simulator's journal about the SAME command id; it had started, so nothing was sent twice.",
-      }[status] || status;
-      await caption(page, explain, 4500);
+      await page.waitForLoadState("domcontentloaded");
+      await caption(page, explain[status] || status, status === "START_INTENT" ? 500 : 4500);
+    } else {
+      await page.waitForTimeout(200);
     }
-    if (status === "RUNNING") break;
-    await page.waitForTimeout(1000);
   }
   step(`attempt states seen: ${seen.join(" -> ")}`);
 
@@ -216,9 +218,10 @@ async function attemptStatus(page, jobId) {
   await page.goto(`${SITE}/ops`);
   await page.waitForLoadState("networkidle");
   await page.locator("tr", { hasText: short(orderId) }).getByRole("button", { name: "Ready for handoff" }).click();
-  await page.waitForLoadState("networkidle");
+  // Change the filter only after the action has reloaded the list (the page reloads the filter the action started with).
+  await page.locator("tr", { hasText: short(orderId) }).waitFor({ state: "detached", timeout: 30000 });
   await page.getByLabel("Orders").selectOption("READY_FOR_HANDOFF");
-  await page.waitForLoadState("networkidle");
+  await page.locator("tr", { hasText: short(orderId) }).getByRole("button", { name: "Handed over" }).waitFor({ timeout: 30000 });
   await caption(page, "Ready for handoff, then handed over when the customer collects it.", 2500);
   await page.locator("tr", { hasText: short(orderId) }).getByRole("button", { name: "Handed over" }).click();
   await page.waitForLoadState("networkidle");
