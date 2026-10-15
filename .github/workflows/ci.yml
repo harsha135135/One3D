@@ -2,8 +2,8 @@
 # all jobs pass. Every run also builds the three images (x86, as on the demo
 # instance). On a push to main, and only after every test job has passed, the
 # images are pushed to ECR tagged with the commit SHA (tags are immutable) and
-# that commit is deployed to the demo through SSM. AWS access uses GitHub's
-# OIDC token and a role that only main can assume; no AWS keys are stored here.
+# publishing does not change the recruiter demo. AWS access uses GitHub's
+# OIDC token and a publishing-only role; no AWS keys are stored here.
 # The jobs that need AWS are skipped until the repository variables exist.
 name: CI
 
@@ -90,7 +90,7 @@ jobs:
 
   images:
     name: Images (built on every run; pushed to ECR from main)
-    needs: [simulator, backend, frontend]
+    needs: [simulator, backend, frontend, operations]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -101,7 +101,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: docker/setup-buildx-action@v4
-      - name: AWS credentials (OIDC, main only)
+      - name: AWS publishing credentials (OIDC, main only)
         if: env.PUSH == 'true'
         uses: aws-actions/configure-aws-credentials@v6
         with:
@@ -144,26 +144,12 @@ jobs:
             infra/monitoring infra/deploy
           aws s3 cp "$RUNNER_TEMP/bundle.tar.gz" "s3://${{ vars.OPS_BUCKET }}/deploy/${{ github.sha }}.tar.gz" --only-show-errors
 
-  deploy:
-    name: Deploy to the demo (main only)
-    needs: images
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ROLE_ARN != ''
+  operations:
+    name: Release and recovery script regression tests (offline)
     runs-on: ubuntu-24.04
-    # One deploy at a time; a newer push waits rather than cancelling one in progress.
-    concurrency:
-      group: deploy-demo
-      cancel-in-progress: false
-    permissions:
-      contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@v5
-      - uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
-      - name: Deploy this commit through SSM
-        env:
-          DEMO_INSTANCE_ID: ${{ vars.DEMO_INSTANCE_ID }}
-          OPS_BUCKET: ${{ vars.OPS_BUCKET }}
-        run: infra/deploy/remote-deploy.sh "${{ github.sha }}"
+      - name: Check release guards without AWS access
+        run: python3 -m unittest discover -s infra/ops/tests -v
+      - name: Check the independent Coming Soon files
+        run: python3 public-coming-soon/checks/static.py

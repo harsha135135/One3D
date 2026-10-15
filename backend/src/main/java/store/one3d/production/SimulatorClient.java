@@ -13,6 +13,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -21,6 +22,9 @@ import java.util.UUID;
  */
 @Component
 class SimulatorClient {
+
+    private static final Set<String> OUTCOMES = Set.of("STARTED", "REJECTED_BUSY", "REJECTED_BED_NOT_CLEAR");
+    private static final Set<String> PHASES = Set.of("RUNNING", "COMPLETED", "FAILED");
 
     /** The start command sent to the simulator. */
     record StartRequest(UUID commandId, UUID printerId, UUID attemptId, UUID jobId, String payloadHash,
@@ -61,7 +65,9 @@ class SimulatorClient {
         if (response.statusCode() == 404) {
             return Optional.empty();
         }
-        return Optional.of(parse(expectOk(response), CommandReport.class));
+        CommandReport report = parse(expectOk(response), CommandReport.class);
+        validateReport(report, commandId, true);
+        return Optional.of(report);
     }
 
     /** Sends a start command. The simulator journals its decision before answering. */
@@ -76,7 +82,30 @@ class SimulatorClient {
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body)));
         CommandReport report = parse(expectOk(response), CommandReport.class);
+        validateReport(report, request.commandId(), false);
         return new CommandReport(report.commandId(), report.outcome(), report.started() ? "RUNNING" : null, null);
+    }
+
+    /**
+     * A parseable 200 response is not enough to release an uncertain attempt.
+     * Only a known decision for the requested command is evidence. The journal
+     * must also name a known execution phase; a start acknowledgement omits it.
+     * An invalid response follows the same reconciliation path as a timeout.
+     */
+    private static void validateReport(CommandReport report, UUID expectedCommandId, boolean journal)
+            throws SimulatorUnavailableException {
+        if (report == null || !expectedCommandId.equals(report.commandId())
+                || report.outcome() == null || !OUTCOMES.contains(report.outcome())) {
+            throw new SimulatorUnavailableException("Simulator response has no matching, known command decision");
+        }
+        if (report.started()) {
+            if ((journal && report.phase() == null)
+                    || (report.phase() != null && !PHASES.contains(report.phase()))) {
+                throw new SimulatorUnavailableException("Simulator response has no known execution phase");
+            }
+        } else if (report.phase() != null) {
+            throw new SimulatorUnavailableException("Simulator refusal unexpectedly describes an execution");
+        }
     }
 
     private HttpResponse<String> send(HttpRequest.Builder request) throws SimulatorUnavailableException {

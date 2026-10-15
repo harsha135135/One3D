@@ -1,5 +1,6 @@
-# GitHub Actions on the main branch of this repository may push images and
-# deploy, with short-lived credentials (OIDC); no AWS keys are stored in GitHub.
+# GitHub Actions may publish images/bundles, but cannot operate the demo.
+# Keep the existing resource/name to avoid replacing the role. Apply this
+# permission reduction with owner approval BEFORE V2 changes reach main.
 resource "aws_iam_openid_connect_provider" "github" {
   url            = "https://token.actions.githubusercontent.com"
   client_id_list = ["sts.amazonaws.com"]
@@ -49,22 +50,6 @@ resource "aws_iam_role_policy" "github_deploy" {
         Effect   = "Allow"
         Action   = "s3:PutObject"
         Resource = "${aws_s3_bucket.ops.arn}/deploy/*"
-      },
-      {
-        Sid    = "RunDeployOnTheInstance"
-        Effect = "Allow"
-        Action = "ssm:SendCommand"
-        Resource = [
-          aws_instance.demo.arn,
-          "arn:aws:ssm:${var.region}::document/AWS-RunShellScript",
-        ]
-      },
-      {
-        # Also: is the demo running? A deploy to a stopped demo is skipped.
-        Sid      = "ReadDeployResult"
-        Effect   = "Allow"
-        Action   = ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations", "ec2:DescribeInstances"]
-        Resource = "*"
       },
     ]
   })

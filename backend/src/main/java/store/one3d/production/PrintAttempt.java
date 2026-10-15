@@ -25,6 +25,10 @@ import java.util.UUID;
 @Table(name = "print_attempt")
 class PrintAttempt {
 
+    // Matches print_attempt.failure_reason. A long external diagnostic must not
+    // prevent saving the terminal outcome and leave the printer reserved forever.
+    private static final int MAX_FAILURE_REASON = 500;
+
     // Assigned here rather than generated, because the printer records the
     // attempt id as its owner before the attempt row is inserted.
     @Id
@@ -110,7 +114,9 @@ class PrintAttempt {
     void fail(String reason, Instant now) {
         require(Set.of(AttemptStatus.RUNNING));
         status = AttemptStatus.FAILED;
-        failureReason = reason;
+        int characters = reason.codePointCount(0, reason.length());
+        failureReason = characters > MAX_FAILURE_REASON
+                ? reason.substring(0, reason.offsetByCodePoints(0, MAX_FAILURE_REASON)) : reason;
         endedAt = now;
     }
 

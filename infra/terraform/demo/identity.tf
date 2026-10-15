@@ -34,7 +34,10 @@ resource "aws_cognito_user_pool" "demo" {
     }
   }
 
-  deletion_protection = "INACTIVE"
+  deletion_protection = "ACTIVE"
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # Members get the OPERATOR role in the application (cognito:groups claim).

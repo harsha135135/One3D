@@ -1,6 +1,28 @@
 # Implementation status
 
-Last reviewed: 2026-10-13
+Last reviewed: 2026-10-15
+
+## Release preparation update
+
+The [release audit and evidence](docs/evidence/2026-10-14-release-preparation.md) supersede
+older deployment assumptions below. Candidate `940a607` passed CI, but its deployment
+job skipped a stopped instance; a subsequent manual deployment failed with the remote
+command still in progress. Current runtime SHA is unverified. No release was tagged.
+
+Prepared on the release branch: strict simulator response validation, bounded failure
+diagnostics, manual manifest-based promotion, CI deployment removal, release-safe
+retention/protection configuration, safer backup/restore scripts and a separate static
+Coming Soon page. Fresh application checks: **265 backend (74 unit + 191 integration),
+14 simulator and 26 frontend tests passed**. See the evidence record for operations and
+site checks and their limits. Cloud changes, private access, final rollback/restore,
+release-policy scope mismatch, owner acceptance and the résumé update remain pending.
+
+The CP9 restore log covers a catalog sample and an exact artifact, with zero custom
+request/revision/quote rows. A restored custom-order chain still needs verification.
+The [review](docs/release-review.md) and [runbook](docs/release-runbook.md) describe these
+gates. Historical checkpoint entries below retain their original dates and evidence.
+
+## Historical checkpoint status
 
 **V1 status: implementation ready; personal review and signoff pending.** Revision tested for review: `70c941e` ([Checkpoint 9 evidence](docs/evidence/2026-10-13-checkpoint-9.md)).
 

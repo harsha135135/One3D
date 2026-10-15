@@ -1,9 +1,12 @@
 package store.one3d.production;
 
 import com.jayway.jsonpath.JsonPath;
+import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
@@ -13,7 +16,11 @@ import store.one3d.support.ApiSteps;
 import store.one3d.support.PostgresIntegrationTest;
 import store.one3d.support.ProductionFixtures;
 import store.one3d.support.SimulatorRig;
+import tools.jackson.databind.json.JsonMapper;
 
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +58,9 @@ class DispatchReconciliationIT {
 
     @Autowired
     SimulatorRig simulator;
+
+    @Autowired
+    ProductionMetrics metrics;
 
     private ApiSteps api;
     private String printerId;
@@ -104,6 +114,61 @@ class DispatchReconciliationIT {
         assertThat(attemptsOfJob(jobId)).hasSize(1);
         String command = simulator.command(commandOf(attemptId).get("id").toString());
         assertThat(command).contains("\"outcome\":\"STARTED\"").contains("\"phase\":\"RUNNING\"");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"commandId\":\"COMMAND\",\"outcome\":\"NEW_OUTCOME\"}",
+            "{\"commandId\":\"00000000-0000-0000-0000-000000000000\",\"outcome\":\"REJECTED_BUSY\"}"})
+    void anInvalidSimulatorReportKeepsAnUncertainAttemptReserved(String response) throws Exception {
+        simulator.dropNextStartAcknowledgement(printerId);
+        String jobId = api.releasedJob();
+        String attemptId = api.recordStart(jobId, printerId);
+        api.dispatch(); // The real simulator is running, but its acknowledgement was lost.
+        String commandId = commandOf(attemptId).get("id").toString();
+
+        HttpServer stub = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        stub.createContext("/", exchange -> {
+            byte[] body = response.replace("COMMAND", commandId).getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        stub.start();
+        try {
+            SimulatorClient client = new SimulatorClient(
+                    () -> URI.create("http://127.0.0.1:" + stub.getAddress().getPort()),
+                    JsonMapper.builder().build(), Duration.ofSeconds(1), Duration.ofSeconds(2));
+            new DispatchWorker(workStore, outcomes, client, metrics, 10, Duration.ofSeconds(30)).runOnce();
+
+            assertThat(attemptStatus(attemptId)).isEqualTo("RECONCILIATION_REQUIRED");
+            assertThat(workOf(attemptId)).containsEntry("status", "PENDING");
+            assertThat(printerRow()).containsEntry("current_attempt_id", UUID.fromString(attemptId))
+                    .containsEntry("bed_state", "OCCUPIED");
+            api.startAttemptRequest(api.releasedJob(), printerId)
+                    .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PRINTER_BUSY"));
+        } finally {
+            stub.stop(0);
+        }
+        api.dispatch(); // A valid journal response recovers the same execution.
+        assertThat(attemptStatus(attemptId)).isEqualTo("RUNNING");
+        assertThat(attemptsOfJob(jobId)).hasSize(1);
+    }
+
+    @Test
+    void aLongFailureReasonDoesNotPreventRecordingTheFailedAttempt() throws Exception {
+        String jobId = api.releasedJob();
+        String attemptId = api.startAttempt(jobId, printerId);
+        String reason = "Failure detail: " + "x".repeat(1_000);
+        assertThat(simulator.fail(printerId, reason)).startsWith("200");
+
+        api.observe();
+
+        assertThat(attemptStatus(attemptId)).isEqualTo("FAILED");
+        assertThat(attempt(attemptId).get("failure_reason")).isEqualTo(reason.substring(0, 500));
+        assertThat(printerRow()).containsEntry("current_attempt_id", null).containsEntry("bed_state", "OCCUPIED");
+        api.get("/api/ops/jobs/" + jobId).andExpect(jsonPath("$.status").value("RELEASED"));
+        api.observe(); // Nothing keeps retrying the already-recorded terminal outcome.
+        assertThat(attemptStatus(attemptId)).isEqualTo("FAILED");
     }
 
     @Test
