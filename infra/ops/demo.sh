@@ -7,11 +7,12 @@
 #                             cleanly, then stop the instance
 #   infra/ops/demo.sh start   start the instance, redeploy the deployed commit
 #                             (renews the certificate if due) and check the site;
-#                             then deploy the latest passing commit on main if newer
+#                             never change its approved release
 # While stopped, only the disks, the Elastic IP and stored images/files cost money.
 set -euo pipefail
 export AWS_PROFILE=${AWS_PROFILE:-one3d-deployer} AWS_REGION=${AWS_REGION:-ap-south-1} AWS_PAGER=""
 TF=$(cd "$(dirname "$0")/../terraform/demo" && pwd)
+LOCK_SCRIPT=$(cat "$(dirname "$0")/../deploy/host-lock.sh")
 out() { terraform -chdir="$TF" output -raw "$1"; }
 INSTANCE=$(out instance_id)
 OPS_BUCKET=$(out ops_bucket)
@@ -23,7 +24,8 @@ state() { aws ec2 describe-instances --instance-ids "$INSTANCE" --query 'Reserva
 run_on_instance() {
   local what=$1; shift
   local params id status
-  params=$(jq -n --args '{commands: $ARGS.positional, executionTimeout: ["900"]}' "$@")
+  params=$(jq -n --args '{commands: $ARGS.positional, executionTimeout: ["900"]}' \
+    "set -eu" "$LOCK_SCRIPT" "one3d_lock /opt/one3d" "$@")
   id=$(aws ssm send-command --instance-ids "$INSTANCE" --document-name AWS-RunShellScript \
     --comment "One3D demo.sh: $what" --parameters "$params" --query Command.CommandId --output text)
   for i in $(seq 1 90); do
@@ -56,9 +58,10 @@ case ${1:-status} in
     run_on_instance "backup and stop containers" \
       "set -e" \
       "cd /opt/one3d/app" \
-      "docker compose --env-file /opt/one3d/one3d.env -f compose.yaml -f compose.deploy.yaml exec -T db pg_dump -U one3d -d one3d --format=custom | aws s3 cp - s3://$OPS_BUCKET/backups/one3d-$stamp.dump --only-show-errors" \
+      "bash -o pipefail -c 'docker compose --env-file /opt/one3d/one3d.env -f compose.yaml -f compose.deploy.yaml exec -T db pg_dump -U one3d -d one3d --format=custom | aws s3 cp - s3://$OPS_BUCKET/backups/one3d-$stamp.dump --only-show-errors'" \
       "echo backup: s3://$OPS_BUCKET/backups/one3d-$stamp.dump" \
-      "docker compose --env-file /opt/one3d/one3d.env -f compose.yaml -f compose.deploy.yaml stop"
+      "docker compose --env-file /opt/one3d/one3d.env -f compose.yaml -f compose.deploy.yaml stop" \
+      "cat /proc/sys/kernel/random/boot_id > /opt/one3d/shutdown-requested"
     aws ec2 stop-instances --instance-ids "$INSTANCE" --output text > /dev/null
     aws ec2 wait instance-stopped --instance-ids "$INSTANCE"
     echo "Stopped. Data stays on the data volume and in S3."
@@ -69,19 +72,13 @@ case ${1:-status} in
       aws ec2 wait instance-running --instance-ids "$INSTANCE"
     fi
     wait_for_ssm
-    run_on_instance "redeploy the deployed commit" \
-      "set -e" "bash /opt/one3d/app/infra/deploy/deploy.sh \$(cat /opt/one3d/deployed-tag)"
+    run_on_instance "start the frozen release" \
+      "set -e" \
+      "test -f /opt/one3d/app/release.json || { echo 'No approved release manifest installed; promote explicitly first' >&2; exit 1; }" \
+      "python3 /opt/one3d/app/infra/deploy/release_manifest.py /opt/one3d/app/release.json --approve \$(cat /opt/one3d/deployed-tag)" \
+      "bash /opt/one3d/app/infra/deploy/deploy.sh \$(cat /opt/one3d/deployed-tag)"
     deployed=$(curl -s --max-time 10 "https://$DOMAIN/api/catalog/configurations" -o /dev/null -w '%{http_code}')
     echo "Site: HTTP $deployed"
-    # A push to main while the demo was stopped was skipped; deploy it now.
-    latest=$(gh run list --workflow ci.yml --branch main --event push --status success --limit 1 --json headSha --jq '.[0].headSha')
-    current=$(aws ssm get-command-invocation --command-id "$(aws ssm send-command --instance-ids "$INSTANCE" \
-      --document-name AWS-RunShellScript --parameters 'commands=["cat /opt/one3d/deployed-tag"]' \
-      --query Command.CommandId --output text)" --instance-id "$INSTANCE" --query StandardOutputContent --output text 2>/dev/null || true)
-    if [ -n "$latest" ] && [ "$latest" != "$(echo "$current" | tr -d '[:space:]')" ]; then
-      echo "Deploying the latest passing commit on main: ${latest:0:12}"
-      gh workflow run deploy.yml --ref main -f sha="$latest"
-    fi
     ;;
   *) echo "usage: demo.sh status|start|stop" >&2; exit 2 ;;
 esac

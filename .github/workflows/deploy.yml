@@ -1,53 +1,23 @@
-# Deploys an earlier commit again (for example to roll back). Only a commit on
-# main whose CI run passed, and whose images are in ECR, can be deployed; its
-# images were built and pushed by that CI run and tags cannot be changed.
-name: Deploy a commit
+# Kept as a clear failure for historical commands. The AWS publishing role must
+# also lose SendCommand: editing a workflow alone cannot protect the demo.
+name: Recruiter deployment requires owner promotion
 
 on:
   workflow_dispatch:
     inputs:
       sha:
-        description: Full commit SHA on main whose CI run passed
-        required: true
+        description: Historical input; this workflow no longer deploys
+        required: false
         type: string
 
 permissions:
   contents: read
 
 jobs:
-  deploy:
-    name: Deploy ${{ inputs.sha }}
-    if: github.ref == 'refs/heads/main'
+  owner-promotion-required:
     runs-on: ubuntu-24.04
-    concurrency:
-      group: deploy-demo
-      cancel-in-progress: false
-    permissions:
-      contents: read
-      actions: read
-      id-token: write
     steps:
-      - uses: actions/checkout@v5
-      - name: The commit's CI run on main passed
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SHA: ${{ inputs.sha }}
+      - name: Explain the release boundary
         run: |
-          [[ $SHA =~ ^[0-9a-f]{40}$ ]] || { echo "Not a full commit SHA" >&2; exit 1; }
-          conclusion=$(gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?head_sha=$SHA&branch=main&event=push" \
-            --jq '[.workflow_runs[] | select(.conclusion == "success")] | length')
-          [ "$conclusion" -ge 1 ] || { echo "No successful CI run on main for $SHA" >&2; exit 1; }
-      - uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
-      - name: Its images are in ECR
-        run: |
-          for repo in one3d-backend one3d-frontend one3d-simulator; do
-            aws ecr describe-images --repository-name "$repo" --image-ids imageTag=${{ inputs.sha }} > /dev/null
-          done
-      - name: Deploy through SSM
-        env:
-          DEMO_INSTANCE_ID: ${{ vars.DEMO_INSTANCE_ID }}
-          OPS_BUCKET: ${{ vars.OPS_BUCKET }}
-        run: infra/deploy/remote-deploy.sh "${{ inputs.sha }}"
+          echo "::error::GitHub Actions cannot deploy the frozen recruiter demo. Use the reviewed release manifest and infra/deploy/remote-deploy.sh from an owner-authenticated terminal after approval."
+          exit 1

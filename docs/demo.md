@@ -4,7 +4,7 @@ How to show One3D V1 in about five minutes, live on `https://demo.one3d.store` o
 
 ## Before the demo (about 5 minutes)
 
-1. **Start the demo:** `infra/ops/demo.sh start`, as the deployment user. It takes about 75 seconds and deploys the latest tested `main` commit.
+1. **Start the demo:** after the approved release manifest is installed, use `infra/ops/demo.sh start` as the deployment user. It starts only that frozen release. The first transition and current runtime verification are pending; follow [release-runbook.md](release-runbook.md), not a historical startup script.
 2. **Sign-in details:** the demo users are `customer.demo@example.com` and `operator.demo@example.com`. Each needs a password and a TOTP code:
    ```bash
    aws ssm get-parameter --name /one3d/demo-users/customer --with-decryption --query Parameter.Value --output text

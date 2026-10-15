@@ -22,12 +22,15 @@ ARTIFACTS=$(terraform -chdir="$TF" output -raw artifacts_bucket)
   --output text)" = running ] || { echo "The demo is not running (infra/ops/demo.sh start)" >&2; exit 1; }
 
 # The host script travels inside the command, so the instance needs nothing new.
-script=$(base64 < "$HERE/restore-check-host.sh" | tr -d '\n')
+script=$(cat "$HERE/../deploy/host-lock.sh" "$HERE/restore-check-host.sh" | base64 | tr -d '\n')
 id=$(aws ssm send-command --instance-ids "$INSTANCE" --document-name AWS-RunShellScript \
   --comment "One3D restore check" --parameters "$(jq -n --arg s "$script" --arg o "$OPS" --arg a "$ARTIFACTS" \
     --arg r "$AWS_REGION" '{commands: [
-      "echo \($s) | base64 -d > /tmp/one3d-restore-check.sh",
-      "bash /tmp/one3d-restore-check.sh aws \($o) \($a) \($r); status=$?; rm -f /tmp/one3d-restore-check.sh; exit $status"
+      "set -eu",
+      "one3d_restore_script=$(mktemp /tmp/one3d-restore-check.XXXXXX)",
+      "trap '\''rm -f \"$one3d_restore_script\"'\'' EXIT",
+      "echo \($s) | base64 -d > \"$one3d_restore_script\"",
+      "bash \"$one3d_restore_script\" aws \($o) \($a) \($r)"
     ], executionTimeout: ["600"]}')" --query Command.CommandId --output text)
 for i in $(seq 1 120); do
   status=$(aws ssm get-command-invocation --command-id "$id" --instance-id "$INSTANCE" --query Status --output text \

@@ -1,9 +1,11 @@
 # --- customer model files: private, versioned, encrypted ----------------------
 
 resource "aws_s3_bucket" "artifacts" {
-  bucket = "${local.name}-artifacts-${random_id.suffix.hex}"
-  # The demo is disposable: destroying it removes the uploaded test files.
-  force_destroy = true
+  bucket        = "${local.name}-artifacts-${random_id.suffix.hex}"
+  force_destroy = false
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_s3_bucket_versioning" "artifacts" {
@@ -84,7 +86,10 @@ resource "aws_s3_bucket_policy" "artifacts_tls_only" {
 
 resource "aws_s3_bucket" "ops" {
   bucket        = "${local.name}-ops-${random_id.suffix.hex}"
-  force_destroy = true
+  force_destroy = false
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_s3_bucket_versioning" "ops" {
@@ -121,16 +126,12 @@ resource "aws_s3_bucket_ownership_controls" "ops" {
 resource "aws_s3_bucket_lifecycle_configuration" "ops" {
   bucket = aws_s3_bucket.ops.id
   rule {
-    id     = "expire-old-deploy-bundles"
+    # Old release bundles and their object versions remain recoverable.
+    id     = "abort-incomplete-uploads"
     status = "Enabled"
-    filter {
-      prefix = "deploy/"
-    }
-    expiration {
-      days = 30
-    }
-    noncurrent_version_expiration {
-      noncurrent_days = 7
+    filter {}
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
     }
   }
 }

@@ -1,5 +1,7 @@
 # Infrastructure: the AWS demo
 
+**Release preparation, 2026-10-15:** use the [release runbook](../docs/release-runbook.md) and [manifest interface](deploy/README.md). The current deployed SHA and private-access setup are unverified. All cloud operations require the approval specified in that runbook. GitHub CI publishes artifacts; it does not deploy.
+
 The One3D demo runs on demand in `ap-south-1` at `https://demo.one3d.store`, paid from AWS promotional credits, which are shared with OneCreations in the same account. Decisions and costs are in [decision 0003](../docs/decisions/0003-aws-demo-deployment.md).
 
 ```text
@@ -38,42 +40,31 @@ It is used through `aws login --profile one3d-deployer --region ap-south-1`, run
 
 **GitHub Actions** never uses this user. It assumes `one3d-demo-github-deploy` through OIDC, from the `main` branch only. The role trusts the token subject `repo:harsha135135@<owner id>/One3D@<repository id>:ref:refs/heads/main`, which is the form this repository's tokens use. It contains GitHub's numeric ids, so a different repository later created under the same name cannot match it. The prefix is the Terraform variable `github_oidc_subject_prefix`. If the role cannot be assumed, check the `sub` of a token (the error names it) against that variable.
 
-## First-time setup
+## Existing environment and first transition
 
-1. Create the state bucket and initialize the demo's state:
-   ```bash
-   terraform -chdir=infra/terraform/bootstrap init && terraform -chdir=infra/terraform/bootstrap apply
-   terraform -chdir=infra/terraform/demo init -backend-config="bucket=one3d-tfstate-<account>"
-   terraform -chdir=infra/terraform/demo apply
-   ```
-2. Put Razorpay's **test** keys into SSM. They stay out of Terraform's state, and the values are read from `.env` without being echoed:
-   - `/one3d/demo/razorpay-key-id`
-   - `/one3d/demo/razorpay-key-secret`
-   - `/one3d/demo/razorpay-webhook-secret`
-3. Set the GitHub repository variables from the Terraform outputs:
-   - `AWS_DEPLOY_ROLE_ARN`, `AWS_REGION`, `DEMO_INSTANCE_ID`, `ECR_REGISTRY`, `OPS_BUCKET`
-4. Add an `A` record for `demo.one3d.store` at the DNS provider (Hostinger) pointing at the `public_ip` output.
-5. Merge to `main`. CI tests, pushes the images by commit SHA and deploys. On the first deploy, `deploy.sh` obtains the Let's Encrypt certificate.
-6. In the Razorpay dashboard (test mode), add the webhook:
-   - URL: `https://demo.one3d.store/api/payments/razorpay/webhook`
-   - the same secret
-   - events `payment.captured`, `order.paid`, `payment.authorized` and `payment.failed`
-7. Account budgets, run once: `ALERT_EMAIL=<address> infra/account/budgets.sh`.
-8. Synthetic demo users: `infra/ops/demo-users.sh customer` and `infra/ops/demo-users.sh operator`. Each creates the user in Cognito, enrols an authenticator and stores the email, password and TOTP secret as a SecureString in `/one3d/demo-users/<role>`, without printing them. To sign in by hand, read the parameter with `--with-decryption` and add its `totp_uri` to an authenticator app. Running the script again resets the user.
+This task preserves the existing instance, volumes, buckets and identity pool. Do not
+re-run provisioning or change DNS from historical setup commands. The proposed IAM,
+retention and destruction protections need a separately reviewed plan and approval.
+The first frozen promotion requires a verified manifest and current runtime inspection;
+see the [release runbook](../docs/release-runbook.md).
 
 ## Daily use
 
 | Task | Command |
 |---|---|
-| Start the demo | `infra/ops/demo.sh start`. Starts the instance, redeploys (renewing the certificate if due), checks the site, then deploys the latest passing commit if it is newer. It takes about 75 seconds; for the last 15 or so the site answers 502 while the backend starts |
+| Start the demo | `infra/ops/demo.sh start`, only after the approved manifest is installed. Starts the installed frozen release; never selects latest main. |
 | Stop the demo | `infra/ops/demo.sh stop`. Backs the database up to the ops bucket, stops the containers cleanly, then stops the instance. Not in the minutes after a payment: Razorpay's webhook deliveries fail while the demo is stopped, and Razorpay disables a webhook after about a day of failures (check it in the dashboard after a long stop) |
 | Check it | `infra/ops/demo.sh status` |
 | Finish a simulated print | `bash /opt/one3d/app/infra/deploy/simulator.sh complete`, on the instance through SSM. The simulator's controls are reachable only on its internal network |
 | Roll back | See below |
 
-**Rolling back** to an earlier commit: Actions → "Deploy a commit" with that commit's full SHA (`gh workflow run deploy.yml --ref main -f sha=<sha>`). The workflow checks that the commit's CI run on `main` passed and that its images are in ECR, then deploys those exact images. `/opt/one3d/previous-tag` on the instance records what was running before. Each deploy also unpacks that commit's Compose and Nginx files; Nginx is recreated when its templates differ from the running ones (a hash label set by `deploy.sh`). Commits before `8b1837d` lack that label, so a deploy between two such commits leaves Nginx's configuration as it was: run `demo.sh stop` and `start` afterwards. A rollback replaces the images and those files, not the database. If a newer commit added a Flyway migration, the older code starts against the newer schema (by default Flyway ignores applied migrations newer than the code), and whether that works depends on the change. Then either deploy a fix forward or restore the backup taken before that deploy into a fresh database. Check `backend/src/main/resources/db/migration` between the two commits before rolling back.
+**Rollback requires a reviewed manifest and compatible data.** The GitHub deployment
+workflow refuses runtime deployment. Use [the explicit promotion procedure](deploy/README.md)
+after approval. Do not run old images against an unknown newer schema or restore over
+the live database. Test a restoration in isolation and reconcile simulator/provider
+state before any approved switch.
 
-**What survives a stop, a start and even replacing the instance:**
+**Persisted independently of the application containers:**
 - the database, the simulator journal and the TLS certificates, on the separate encrypted 4 GB data volume;
 - uploaded files, in the versioned S3 bucket;
 - images, in ECR.
@@ -139,57 +130,11 @@ To restore the **live** database from a backup, for example after a bad migratio
 
 This is a single-instance demo with no replica. Anything written after the newest backup is lost when restoring.
 
-## Replacing the instance
+## Replacement and destruction
 
-The instance is disposable; the data volume, the Elastic IP, the buckets, ECR and Cognito are not. To get a fresh instance (a broken root disk, a new Amazon Linux image), use the phases of [`infra/ops/replace-instance.sh`](ops/replace-instance.sh), with `PLAN_FILE` set outside the repository because a saved plan holds sensitive values. Checkpoint 8 used it ([the copy that ran](../docs/evidence/2026-10-12-checkpoint-8/cloud/replace-instance.sh)). In this copy, turning termination protection off and on also goes through a saved plan that may change nothing else:
-
-1. **`prepare`:**
-   - `demo.sh stop` (a backup) and a snapshot of the data volume;
-   - termination protection off;
-   - a saved plan for `terraform apply -replace=aws_instance.demo`, which it refuses unless the only resources deleted are the instance and its volume attachment.
-2. **`apply`:**
-   - applies that plan and waits for the first boot. The boot script mounts the existing data volume and formats it only if it is empty;
-   - sets the GitHub variable `DEMO_INSTANCE_ID` to the new instance, and turns protection on again.
-3. **`deploy`:** deploys the current `main` commit. The certificate is reused from the data volume.
-
-Then check the site and a few records, run `terraform plan` (it should show no changes), and delete the snapshot.
-
-## Destroying the demo
-
-1. Remove the GitHub repository variables (`gh variable delete …`), so a later push to `main` does not try to deploy.
-2. Optionally make a final backup: `infra/ops/demo.sh stop` writes one to the ops bucket. Download it if you want to keep it, because the next step deletes the bucket.
-3. Turn off termination protection:
-   ```bash
-   terraform -chdir=infra/terraform/demo apply -var termination_protection=false
-   ```
-   AWS can report the old value for about a minute after the change; check it with `aws ec2 describe-instance-attribute --attribute disableApiTermination` before step 4.
-4. Destroy the demo:
-   ```bash
-   terraform -chdir=infra/terraform/demo destroy
-   ```
-   This deletes the instance, both volumes, the Elastic IP, both buckets with their files, ECR, Cognito, the parameters, the IAM roles and the GitHub OIDC provider.
-5. Remove Razorpay's keys, the demo users' sign-in details (`/one3d/demo-users/*`) and anything else left under `/one3d/`:
-   ```bash
-   aws ssm delete-parameters --names …
-   ```
-6. Remove the `A` record at Hostinger, and the webhook in the Razorpay dashboard.
-7. Empty the state bucket's object versions, then destroy it:
-   ```bash
-   terraform -chdir=infra/terraform/bootstrap destroy
-   ```
-8. Delete the `one3d-deployer` user and its policy (as root, or as another administrator).
-9. Check that nothing remains. The deployment user can run each of these (all should be empty):
-   ```bash
-   aws ec2 describe-instances --filters Name=tag:Name,Values=one3d-demo Name=instance-state-name,Values=pending,running,stopping,stopped
-   aws ec2 describe-volumes --filters Name=tag:Name,Values=one3d-demo-data
-   aws ec2 describe-addresses --filters Name=tag:Name,Values=one3d-demo
-   aws ec2 describe-snapshots --owner-ids self
-   aws s3 ls | grep one3d
-   aws ecr describe-repositories --query 'repositories[?starts_with(repositoryName, `one3d`)]'
-   aws cognito-idp list-user-pools --max-results 20 --query 'UserPools[?starts_with(Name, `one3d`)]'
-   aws ssm get-parameters-by-path --path /one3d/ --recursive --query 'Parameters[].Name'
-   ```
-   A single tag query (`aws resourcegroupstaggingapi get-resources --tag-filters Key=Project,Values=one3d`) needs `tag:GetResources`. The policy in `infra/iam/` now grants it (an earlier version named it wrongly). Applying that version is optional, done once as root with `aws iam create-policy-version --policy-arn <arn> --policy-document file://infra/iam/one3d-deployer-policy.json --set-as-default`.
-   Check the next day's bill as well.
-
-The account-wide budgets stay in place for OneCreations unless you remove them.
+Both are outside the release-preparation scope. `replace-instance.sh` deliberately
+refuses all modes, and Terraform adds destruction protections. Do not delete the
+instance, data volume, release images, buckets or state to rehearse recovery.
+Use a separate approved plan if replacement or decommissioning is ever needed.
+The earlier procedures are preserved as historical context in
+[the original runbook](../docs/history/infra-before-freeze-2026-10-13.md); they are not current instructions.

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://one3d.store/sitemap.xml

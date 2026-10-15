@@ -9,7 +9,24 @@ One3D is the planned custom-manufacturing business of [OneCreations](https://git
 
 V1 is **not yet accepted**. Checkpoint 1 was signed off by the owner. At the owner's request, an assistant implemented Checkpoints 3–9 (and Checkpoint 2's attempt limit). The owner's reviews of Checkpoints 2–9 were deferred until V1 was implemented, and are the next step.
 
-Status: **implementation ready; personal review and signoff pending** · Updated: 2026-10-13
+Status: **release preparation; runtime verification, personal review and signoff pending** · Updated: 2026-10-15
+
+## Release preparation
+
+The [independent review](docs/release-review.md) covers the architecture, release risks
+and interview scope. Follow the [freeze/recovery runbook](docs/release-runbook.md),
+[private-demo design](docs/private-demo.md) and [ownership exercises](docs/interview-defense.md).
+[Fresh verification](docs/evidence/2026-10-14-release-preparation.md) includes 265 backend,
+14 simulator and 26 frontend browser tests. The proposed release safeguards have not
+been applied to AWS; no V1 tag or private-access claim has been made.
+
+- `onecreations.in`: public portfolio.
+- `one3d.store`: independent [Coming Soon files](public-coming-soon/README.md), prepared for approval.
+- `demo.one3d.store`: existing demo; private access and exact deployed SHA remain unverified.
+
+CI publishes tested artifacts without deploying them. The revised startup script keeps
+the installed approved release; owner promotion requires an explicit immutable manifest.
+See [deployment instructions](infra/deploy/README.md) before using any historical runbook.
 
 ## What we are building first
 

@@ -46,7 +46,8 @@ resource "aws_instance" "demo" {
   # A new AMI release or a changed first-boot script never replaces the
   # running instance (replacement is an explicit decision: terraform apply -replace).
   lifecycle {
-    ignore_changes = [ami, user_data]
+    ignore_changes  = [ami, user_data]
+    prevent_destroy = true
   }
 }
 
@@ -54,6 +55,9 @@ resource "aws_instance" "demo" {
 # replacing the instance keeps the database, the simulator journal and the
 # certificates.
 resource "aws_ebs_volume" "data" {
+  lifecycle {
+    prevent_destroy = true
+  }
   availability_zone = data.aws_subnet.chosen.availability_zone
   size              = var.data_volume_gb
   type              = "gp3"
@@ -68,6 +72,9 @@ resource "aws_volume_attachment" "data" {
 }
 
 resource "aws_eip" "demo" {
+  lifecycle {
+    prevent_destroy = true
+  }
   domain   = "vpc"
   instance = aws_instance.demo.id
   tags     = { Name = local.name }

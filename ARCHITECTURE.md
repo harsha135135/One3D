@@ -73,7 +73,7 @@ infra/
   deploy/  ops/             deploy scripts; start/stop, backups, restore check, instance replacement
   iam/  account/            the deployment user's policy; account budgets
   README.md                 the AWS runbook
-.github/workflows/          ci.yml (tests, images, deploy), deploy.yml (redeploy a tested commit)
+.github/workflows/          ci.yml (tests and image publishing); deploy.yml refuses runtime deployment
 compose.yaml  compose.override.yaml  compose.deploy.yaml
 docs/
   decisions/  evidence/     decision records; one evidence record per checkpoint

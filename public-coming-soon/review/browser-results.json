@@ -1,0 +1,52 @@
+{
+  "checkedAt": "2026-10-14T13:36:08.643Z",
+  "browser": "156.0.8078.4",
+  "origin": "http://127.0.0.1:4179",
+  "viewports": [
+    {
+      "width": 320,
+      "horizontalOverflow": false,
+      "brokenImages": 0,
+      "minimumLinkHeight": 44,
+      "keyboardSkipLink": "passed"
+    },
+    {
+      "width": 390,
+      "horizontalOverflow": false,
+      "brokenImages": 0,
+      "minimumLinkHeight": 44,
+      "keyboardSkipLink": "passed"
+    },
+    {
+      "width": 780,
+      "horizontalOverflow": false,
+      "brokenImages": 0,
+      "minimumLinkHeight": 44,
+      "keyboardSkipLink": "passed"
+    },
+    {
+      "width": 1024,
+      "horizontalOverflow": false,
+      "brokenImages": 0,
+      "minimumLinkHeight": 44,
+      "keyboardSkipLink": "passed"
+    },
+    {
+      "width": 1440,
+      "horizontalOverflow": false,
+      "brokenImages": 0,
+      "minimumLinkHeight": 44,
+      "keyboardSkipLink": "passed"
+    }
+  ],
+  "reducedMotion": "No animations",
+  "runtimeJavaScript": false,
+  "formsOrFrames": false,
+  "externalPageRequests": false,
+  "errors": [],
+  "limitations": [
+    "Python preview does not apply hosting _headers or _redirects",
+    "Hosting, HTTPS, custom DNS and social-network parsing remain unverified",
+    "No screen-reader or field-performance audit claimed"
+  ]
+}
